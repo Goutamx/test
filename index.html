@@ -408,8 +408,13 @@ AI will automatically:
               <button class="btn btn-secondary" onclick="processOffline()">
                 <span class="material-symbols-rounded">bolt</span> Offline Mode
               </button>
+              <button class="btn btn-secondary" onclick="testAIConnection()">
+                <span class="material-symbols-rounded">network_check</span> Test AI
+              </button>
               <button class="btn btn-secondary" onclick="document.getElementById('pasteArea').value=''">Clear</button>
             </div>
+            <div class="ai-status" id="aiStatusLine">… Checking AI…</div>
+            <div class="ai-test-box" id="aiTestResult" style="display:none;"></div>
           </div>
 
           <!-- MANUAL TAB -->
@@ -596,6 +601,11 @@ AI will automatically:
 </div>
 
 <style>
+  .ai-status{margin-top:12px;font-size:0.8rem;font-weight:600;color:var(--text-muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .ai-test-box{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--bg-section);border:1px solid var(--border-color);font-size:0.8rem;line-height:1.8;color:var(--text-main);}
+  .ai-ok{color:var(--success);font-weight:700;}
+  .ai-warn{color:var(--warning);font-weight:700;}
+  .ai-bad{color:var(--error);font-weight:700;}
   .type-btn{padding:7px 14px;font-size:0.78rem;font-weight:600;border-radius:50px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);cursor:pointer;font-family:inherit;}
   .type-btn.active{background:var(--accent);color:#FFF;border-color:var(--accent);}
   .q-card{background:var(--bg-section);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;margin-bottom:12px;}
@@ -642,6 +652,8 @@ window.addEventListener('DOMContentLoaded', () => {
   refreshLivePreviews();
   // default one sub-part row
   addSubPartRow();
+  // silently check whether the AI endpoint is reachable (updates the status line)
+  probeAIStatus();
 });
 
 function dismissWelcome() {
@@ -1264,7 +1276,8 @@ function processOffline() {
   questions = questions.concat(add);
   document.getElementById('questionsListCard').style.display = 'block';
   saveState(); updateSectionDropdowns(); renderQuestionsList(); refreshLivePreviews();
-  showSnackbar(`Offline: added ${add.length} questions`);
+  setAIStatus('offline', `${add.length} question${add.length === 1 ? '' : 's'} parsed without AI`);
+  showSnackbar(`⚡ Offline: added ${add.length} question${add.length === 1 ? '' : 's'}`);
 }
 
 function loadMessySample() {
@@ -1300,9 +1313,10 @@ Fill-ups: 21-Urban
 
 /* ---------- AI PASTE (CORS-FRIENDLY) ---------- */
 const PASTE_PROMPT = `You extract exam questions from messy teacher/ChatGPT text.
-Return ONLY a JSON array (no markdown fences). Each item:
+Return ONLY a JSON array (no markdown fences, no explanation). Each item MUST use EXACTLY these keys:
 {"text":"...","marks":1,"type":"subjective|mcq|tf|fill|subq|or","options":[],"subQuestions":[{"label":"a","text":"...","marks":1}],"orAlternative":null,"section":"Section A"}
 RULES:
+- Put the question wording in the key "text". NEVER use a key named "question" or "q".
 - Ignore titles, preambles, tips, ANSWER KEY, tables, fill-up keys, solutions.
 - Keep only real questions.
 - For (a)(b)(c) with own marks -> type subq.
@@ -1310,32 +1324,131 @@ RULES:
 - Section headers like "SECTION D: 2-MARK" set section + default marks.
 - Never include answers in text.`;
 
-/* ---------- SHARED AI REQUEST (POST first, GET fallback) ---------- */
+/* ---------- SHARED AI REQUEST (retry + POST first, GET fallback) ---------- */
 async function aiRequest(payload, shortPrompt) {
-  // 1) OpenAI-style POST — handles long pastes
-  try {
-    const res = await fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    let content = data.choices?.[0]?.message?.content || data.content || data.text || '';
-    if (typeof content !== 'string') content = JSON.stringify(content);
-    return content;
-  } catch (e) {
-    // 2) plain GET fallback — works when the POST endpoint is down
-    if (shortPrompt) {
-      const encoded = encodeURIComponent(shortPrompt);
-      if (encoded.length < 7000) {
-        const res2 = await fetch('https://text.pollinations.ai/' + encoded);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const RETRY_HTTP = /\b(402|429|500|502|503|504)\b/; // 402 = free-tier rate limit
+  let lastErr = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch('https://text.pollinations.ai/openai?referrer=testpaper-pro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      let content = data.choices?.[0]?.message?.content || data.content || data.text || '';
+      // reasoning models sometimes put the whole answer in "reasoning" and leave content empty
+      if ((!content || !String(content).trim()) && data.choices?.[0]?.message?.reasoning) {
+        content = data.choices[0].message.reasoning;
+      }
+      if (typeof content !== 'string') content = JSON.stringify(content);
+      return content;
+    } catch (e) {
+      lastErr = e;
+      const msg = String((e && e.message) || e);
+      const isRate = RETRY_HTTP.test(msg);
+      const isNet = (e && e.name === 'TypeError') || /fetch|network|Failed/i.test(msg);
+      const canRetry = (isRate && attempt < 2) || (isNet && attempt < 1);
+      if (!canRetry) break;
+      const wait = 3000 * (attempt + 1);
+      const desc = document.getElementById('aiStatusDesc');
+      if (desc && document.getElementById('aiOverlay') && document.getElementById('aiOverlay').classList.contains('active')) {
+        desc.textContent = `AI is busy (rate limit${isNet ? ' / network' : ''}) — retrying in ${wait / 1000}s…`;
+      }
+      await sleep(wait);
+    }
+  }
+
+  // GET fallback (short prompts only — different rate-limit bucket)
+  if (shortPrompt) {
+    const encoded = encodeURIComponent(shortPrompt);
+    if (encoded.length < 7000) {
+      try {
+        const res2 = await fetch('https://text.pollinations.ai/' + encoded + '?referrer=testpaper-pro');
         if (!res2.ok) throw new Error('HTTP ' + res2.status);
         return await res2.text();
-      }
+      } catch (e2) { lastErr = lastErr || e2; }
     }
-    throw e;
   }
+  throw lastErr || new Error('AI unreachable');
+}
+
+/* ---------- AI STATUS LINE (always visible so you can tell AI vs Offline) ---------- */
+function setAIStatus(kind, text) {
+  const el = document.getElementById('aiStatusLine');
+  if (!el) return;
+  const icon = kind === 'ai' ? '✨' : (kind === 'offline' ? '⚡' : (kind === 'bad' ? '❌' : '…'));
+  const cls = kind === 'ai' ? 'ai-ok' : (kind === 'offline' ? 'ai-warn' : (kind === 'bad' ? 'ai-bad' : ''));
+  el.innerHTML = `${icon} <span class="${cls}">${kind === 'ai' ? 'AI mode' : (kind === 'offline' ? 'Offline mode' : (kind === 'bad' ? 'AI unreachable' : 'Checking AI…'))}</span> — ${escapeHTML(text)}`;
+}
+
+/* ---------- AI DIAGNOSTICS: "Test AI" button + auto probe ---------- */
+async function probeAIStatus() {
+  const t0 = Date.now();
+  try {
+    const r = await fetch('https://text.pollinations.ai/Reply%20with%20exactly%3A%20PONG');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await r.text();
+    setAIStatus('ai', `connection OK (${Date.now() - t0}ms) — Process with AI will use the AI`);
+  } catch (e) {
+    setAIStatus('bad', `cannot reach text.pollinations.ai (${e.message || 'network error'}) — app will use Offline mode`);
+  }
+}
+
+async function testAIConnection() {
+  const box = document.getElementById('aiTestResult');
+  if (box) { box.style.display = 'block'; box.innerHTML = '⏳ Testing AI connection…'; }
+  const line = (ok, label, info) =>
+    `<div>${ok ? '✅' : '❌'} <b>${label}</b> — ${escapeHTML(info)}</div>`;
+  let out = '';
+  let getOk = false, postOk = false;
+
+  // 1) simple GET (what the offline-proof fallback uses)
+  let t0 = Date.now();
+  try {
+    const r = await fetch('https://text.pollinations.ai/Reply%20with%20exactly%3A%20PONG');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const txt = await r.text();
+    getOk = true;
+    out += line(true, 'Basic endpoint (GET)', `OK in ${Date.now() - t0}ms — replied: "${txt.trim().slice(0, 40)}"`);
+  } catch (e) {
+    out += line(false, 'Basic endpoint (GET)', (e && e.message) || 'network error');
+  }
+
+  // 2) full chat API (what "Process with AI" uses)
+  t0 = Date.now();
+  try {
+    const r = await fetch('https://text.pollinations.ai/openai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai', temperature: 0, messages: [{ role: 'user', content: 'Reply with exactly: PONG' }] })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const msg = data.choices?.[0]?.message?.content || data.content || data.text || '';
+    const reply = String(msg).trim().slice(0, 40);
+    postOk = true;
+    out += line(true, 'AI chat API (POST)', `OK in ${Date.now() - t0}ms — model: ${data.model || 'n/a'} — replied: "${reply}"`);
+  } catch (e) {
+    out += line(false, 'AI chat API (POST)', (e && e.message) || 'network error');
+  }
+
+  // verdict
+  if (getOk && postOk) {
+    out += `<div class="ai-ok" style="margin-top:8px;">🎉 <b>AI is ONLINE</b> — "Process with AI" and the chatbot will use real AI.</div>`;
+    setAIStatus('ai', 'full test passed — AI is online');
+  } else if (getOk && !postOk) {
+    out += `<div class="ai-warn" style="margin-top:8px;">⚠️ <b>Partial</b> — short texts can use AI; long pastes will fall back to Offline mode.</div>`;
+    setAIStatus('offline', 'chat API failed — long pastes will use offline parser');
+  } else {
+    out += `<div class="ai-bad" style="margin-top:8px;">❌ <b>AI is OFFLINE for this browser</b> — the app will use Offline mode.<br>
+      Common causes: ad-blocker / privacy extension blocking pollinations.ai, school/office firewall, no internet, or the free service is rate-limited. Try another network or disable the ad-blocker for this site.</div>`;
+    setAIStatus('bad', 'AI endpoints unreachable — offline mode will be used');
+  }
+  if (box) box.innerHTML = out;
 }
 
 async function processWithAI() {
@@ -1343,6 +1456,7 @@ async function processWithAI() {
   if (!raw) { showSnackbar('Paste text first'); return; }
 
   showAI('AI is reading your paper…', 'Cleaning answers, markdown & structure…');
+  const t0 = Date.now();
   try {
     const payload = {
       model: 'openai',
@@ -1357,43 +1471,50 @@ async function processWithAI() {
     let content = await aiRequest(payload, shortPrompt);
     content = content.replace(/```json/gi,'').replace(/```/g,'').trim();
     const m = content.match(/\[[\s\S]*\]/);
-    if (!m) throw new Error('No JSON array');
-    const arr = JSON.parse(m[0]);
-    if (!Array.isArray(arr) || !arr.length) throw new Error('Empty array');
+    if (!m) throw new Error('AI reply had no JSON array');
+    let arr;
+    try { arr = JSON.parse(m[0]); } catch (e) { throw new Error('AI reply JSON was invalid'); }
+    if (!Array.isArray(arr) || !arr.length) throw new Error('AI reply was an empty list');
 
+    const parsed = ingestQuestions(arr, true);
+    if (!parsed) throw new Error('AI reply had no usable questions (unexpected format)');
     hideAI();
-    const before = questions.length;
-    ingestQuestions(arr, true);
-    const added = Math.max(questions.length - before, 0) || arr.length;
-    showSnackbar(`AI added ${added} question${added === 1 ? '' : 's'}`);
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    setAIStatus('ai', `${parsed} question${parsed === 1 ? '' : 's'} parsed in ${secs}s`);
+    showSnackbar(`✨ AI added ${parsed} question${parsed === 1 ? '' : 's'} (${secs}s)`);
   } catch (e) {
     console.warn(e);
     hideAI();
-    showSnackbar('AI unavailable — using Offline mode');
+    // visible reason + guaranteed offline fallback so nothing is ever "silently the same"
     processOffline();
+    const reason = (e && e.message) ? e.message : 'network error';
+    setAIStatus('offline', `AI error: ${reason} — offline parser used instead`);
+    showSnackbar(`AI failed (${reason}) — Offline parser used`);
   }
 }
 
 function ingestQuestions(arr, replaceIfEmpty = false) {
-  const mapped = (arr || []).filter(q => q && String(q.text||'').trim().length > 3).map(q => {
+  const mapped = (arr || []).filter(q => q && typeof q === 'object').map(q => {
+    // tolerant keys — live AI models sometimes answer with "question"/"q" instead of "text"
+    const text = String(q.text ?? q.question ?? q.q ?? '').trim();
     const section = String(q.section || 'Section A').trim();
     if (section && !sections.includes(section)) sections.push(section);
     const type = ['subjective','mcq','tf','fill','subq','or'].includes(q.type) ? q.type : 'subjective';
     return {
       id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      text: String(q.text).trim(),
+      text,
       marks: parseInt(q.marks,10) || 1,
       type,
       options: Array.isArray(q.options) ? q.options.map(String) : [],
       subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions.map(sq => ({
-        label: String(sq.label||'a'), text: String(sq.text||'').trim(), marks: parseInt(sq.marks,10)||1
+        label: String(sq.label||'a'), text: String(sq.text ?? sq.question ?? '').trim(), marks: parseInt(sq.marks,10)||1
       })) : [],
       orAlternative: q.orAlternative ? String(q.orAlternative) : null,
       image: '',
       section
     };
-  });
-  if (!mapped.length) { showSnackbar('No valid questions'); return; }
+  }).filter(q => q.text.length > 3);
+  if (!mapped.length) { showSnackbar('No valid questions'); return 0; }
   if (replaceIfEmpty && questions.length === 0) questions = mapped;
   else {
     const exist = new Set(questions.map(q => q.text.toLowerCase()));
@@ -1401,6 +1522,7 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
   }
   document.getElementById('questionsListCard').style.display = 'block';
   saveState(); updateSectionDropdowns(); renderQuestionsList(); refreshLivePreviews();
+  return mapped.length;
 }
 
 /* ---------- QUESTION LIST ---------- */
@@ -1596,7 +1718,7 @@ async function sendChatMessage(){
     document.getElementById('chatBody').scrollTop = document.getElementById('chatBody').scrollHeight;
   }catch(e){
     console.warn(e);
-    thinking.textContent = 'Could not reach AI. Check internet and try again.';
+    thinking.textContent = 'Could not reach AI (' + ((e && e.message) || 'network error') + '). Check internet / ad-blocker, or press "Test AI" in the Questions tab.';
   }
 }
 
@@ -1758,5 +1880,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a475fb3bfebd25cd',t:'MTc5MTQ3MTI3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eaa8decca90d6',t:'MTc5MTU2MjMzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
