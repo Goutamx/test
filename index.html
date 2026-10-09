@@ -430,6 +430,16 @@ AI will automatically:
               </div>
               <div class="local-progress" id="localAIProgressWrap"><div class="local-progress-bar" id="localAIProgress"></div></div>
               <div id="localAIStatus" style="margin-top:8px;font-size:0.78rem;font-weight:600;color:var(--text-muted);">Not enabled — click "Enable Local AI" to download the model (one-time, then it's cached).</div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-size:0.76rem;font-weight:700;color:var(--text-muted);">"Unable to find a compatible GPU"? — fix checklist</summary>
+                <ul style="margin:8px 0 0 18px;font-size:0.76rem;color:var(--text-muted);line-height:1.9;">
+                  <li><b>Browser:</b> use the latest <b>Chrome</b> or <b>Edge</b>. Firefox & Safari have incomplete WebGPU support.</li>
+                  <li><b>Hardware acceleration:</b> browser Settings → System → "Use hardware acceleration" must be <b>ON</b> (restart the browser after changing it).</li>
+                  <li><b>Graphics drivers:</b> update your GPU driver (Windows: Settings → Windows Update).</li>
+                  <li><b>Remote desktop / VM / school lab thin client:</b> these usually expose no GPU to the browser — Local AI won't run there; Cloud AI & Offline cover you.</li>
+                  <li><b>Check your status:</b> open <b>chrome://gpu</b> in the address bar — "WebGPU" should say <i>Hardware accelerated</i>; or visit <b>webgpureport.org</b>.</li>
+                </ul>
+              </details>
             </div>
           </div>
 
@@ -1580,14 +1590,47 @@ async function toggleLocalAI() {
   return enableLocalAI();
 }
 
+function gpuGuidanceText() {
+  const ua = navigator.userAgent || '';
+  const isFF = /Firefox\//.test(ua);
+  const isSafari = /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua);
+  const chromeVer = parseInt((ua.match(/Chrome\/(\d+)/) || [])[1] || '0', 10);
+  const edgeVer = parseInt((ua.match(/Edg\/(\d+)/) || [])[1] || '0', 10);
+  if (isFF) return 'Firefox\'s WebGPU support is incomplete — please switch to Chrome or Edge.';
+  if (isSafari) return 'Safari needs macOS 15+ / iOS 18+ and the newest Safari version — Chrome or Edge is recommended.';
+  if ((chromeVer && chromeVer < 113) || (edgeVer && edgeVer < 113)) return 'Your browser is too old for WebGPU — update Chrome/Edge to version 113 or newer.';
+  return 'Checklist: (1) hardware acceleration is ON in browser settings, (2) GPU drivers are updated, (3) you are not on remote desktop / a virtual machine, (4) open chrome://gpu to see the WebGPU status.';
+}
+
+async function checkWebGPUSupport() {
+  if (!navigator.gpu) return { ok: false, reason: 'no-api' };
+  let adapter = null;
+  try { adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }); } catch (e) {}
+  if (!adapter) { try { adapter = await navigator.gpu.requestAdapter(); } catch (e) {} }
+  if (!adapter) return { ok: false, reason: 'no-adapter' };
+  try {
+    const device = await adapter.requestDevice();
+    if (device && typeof device.destroy === 'function') device.destroy();
+  } catch (e) { return { ok: false, reason: 'no-device' }; }
+  return { ok: true };
+}
+
 async function enableLocalAI() {
   if (llmState === 'loading') return;
-  if (!navigator.gpu) {
-    setLocalAIStatus('bad', 'This browser has no WebGPU — use Chrome / Edge 113+ for Local AI. Cloud AI & Offline still work.');
+  const btn = document.getElementById('localAIBtn');
+  // fast pre-flight: fail with real guidance BEFORE downloading anything
+  const support = await checkWebGPUSupport();
+  if (!support.ok) {
+    llmState = 'off';
+    setLocalAIStatus('bad',
+      (support.reason === 'no-api'
+        ? 'This browser has no WebGPU at all. '
+        : 'WebGPU is present but no usable GPU was found on this device. ')
+      + gpuGuidanceText()
+      + ' Don\'t worry — the app automatically uses free Cloud AI + Offline mode instead.');
     return;
   }
   llmState = 'loading';
-  const btn = document.getElementById('localAIBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
   const sel = document.getElementById('localModelSelect');
   const modelId = (sel && sel.value) || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
@@ -1613,7 +1656,12 @@ async function enableLocalAI() {
     console.warn(e);
     llmEngine = null; llmState = 'off';
     setLocalAIProgress(null);
-    setLocalAIStatus('bad', 'Could not start Local AI: ' + ((e && e.message) || e) + ' — Cloud AI / Offline still work.');
+    const msg = String((e && e.message) || e);
+    if (/compatible GPU|WebGPU|GPU device|adapter/i.test(msg)) {
+      setLocalAIStatus('bad', 'Local AI can\'t run on this device. ' + gpuGuidanceText() + ' The app keeps using free Cloud AI + Offline automatically.');
+    } else {
+      setLocalAIStatus('bad', 'Could not start Local AI: ' + msg.slice(0, 160) + ' — Cloud AI / Offline still work.');
+    }
     if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI'; }
   }
 }
@@ -2112,5 +2160,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47ed000dc206ce7',t:'MTc5MTU2Mzg3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eda5eac8e9cd7',t:'MTc5MTU2NDI5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
