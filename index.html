@@ -1348,12 +1348,15 @@ async function aiRequest(payload, shortPrompt) {
       return content;
     } catch (e) {
       lastErr = e;
-      const msg = String((e && e.message) || e);
-      const isRate = RETRY_HTTP.test(msg);
-      const isNet = (e && e.name === 'TypeError') || /fetch|network|Failed/i.test(msg);
+      const origMsg = String((e && e.message) || e);
+      const isRate = RETRY_HTTP.test(origMsg);
+      const isNet = (e && e.name === 'TypeError') || /fetch|network|Failed/i.test(origMsg);
+      // friendly messages instead of cryptic HTTP codes
+      if (/HTTP 402/.test(origMsg)) { try { e.message = 'AI busy — free tier rate limit (try again in a minute)'; } catch (_) {} }
+      else if (/HTTP 429/.test(origMsg)) { try { e.message = 'AI busy — too many requests'; } catch (_) {} }
       const canRetry = (isRate && attempt < 2) || (isNet && attempt < 1);
       if (!canRetry) break;
-      const wait = 3000 * (attempt + 1);
+      const wait = attempt === 0 ? 5000 : 12000; // rate-limit window needs longer gaps
       const desc = document.getElementById('aiStatusDesc');
       if (desc && document.getElementById('aiOverlay') && document.getElementById('aiOverlay').classList.contains('active')) {
         desc.textContent = `AI is busy (rate limit${isNet ? ' / network' : ''}) — retrying in ${wait / 1000}s…`;
@@ -1451,6 +1454,61 @@ async function testAIConnection() {
   if (box) box.innerHTML = out;
 }
 
+/* ---------- ROBUST AI-REPLY PARSER (survives prose around the JSON) ---------- */
+function parseAIQuestionArray(content) {
+  let txt = String(content || '');
+  txt = txt.replace(/```json/gi, '```').replace(/```/g, '').trim();
+
+  const accept = v => {
+    if (Array.isArray(v) && v.length && v.some(x => x && typeof x === 'object')) return v;
+    if (v && typeof v === 'object') {
+      const k = Object.keys(v).find(k => Array.isArray(v[k]) && v[k].length && v[k].some(x => x && typeof x === 'object'));
+      if (k) return v[k];
+    }
+    return null;
+  };
+  const tryParse = s => {
+    try { return accept(JSON.parse(s)); } catch (e) {
+      // repair trailing commas: [1,2,] -> [1,2]
+      try { return accept(JSON.parse(s.replace(/,\s*([\]\}])/g, '$1'))); } catch (e2) {
+        // repair python-style single quotes used as delimiters (not apostrophes in words)
+        try { return accept(JSON.parse(s.replace(/([\{\[,:]\s*)'/g, '$1"').replace(/'(\s*[\}\],:])/g, '"$1'))); } catch (e3) {}
+      }
+    }
+    return null;
+  };
+
+  // 1) whole text is (or contains) valid JSON
+  const direct = tryParse(txt);
+  if (direct) return direct;
+
+  // 2) balanced scan: find every complete [...] block and try to parse it
+  for (let start = 0; start < txt.length; start++) {
+    if (txt[start] !== '[') continue;
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < txt.length; i++) {
+      const ch = txt[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+      } else {
+        if (ch === '"') inStr = true;
+        else if (ch === '[') depth++;
+        else if (ch === ']') {
+          depth--;
+          if (depth === 0) {
+            const got = tryParse(txt.slice(start, i + 1));
+            if (got) return got;
+            break; // this '[' isn't a JSON array — try the next '['
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 async function processWithAI() {
   const raw = document.getElementById('pasteArea').value.trim();
   if (!raw) { showSnackbar('Paste text first'); return; }
@@ -1469,11 +1527,20 @@ async function processWithAI() {
     const shortPrompt = raw.length < 5200 ? (PASTE_PROMPT + '\n\nTEXT:\n' + raw) : '';
 
     let content = await aiRequest(payload, shortPrompt);
-    content = content.replace(/```json/gi,'').replace(/```/g,'').trim();
-    const m = content.match(/\[[\s\S]*\]/);
-    if (!m) throw new Error('AI reply had no JSON array');
-    let arr;
-    try { arr = JSON.parse(m[0]); } catch (e) { throw new Error('AI reply JSON was invalid'); }
+    let arr = parseAIQuestionArray(content);
+    if (!arr) {
+      // one stricter retry — some models answer with prose around the JSON
+      const stricter = await aiRequest({
+        model: 'openai',
+        temperature: 0,
+        messages: [
+          { role: 'system', content: PASTE_PROMPT },
+          { role: 'user', content: raw.slice(0, 120000) + '\n\nIMPORTANT: Reply with ONLY the raw JSON array itself. No words before or after it, no markdown fences, no explanations.' }
+        ]
+      }, '');
+      arr = parseAIQuestionArray(stricter);
+    }
+    if (!arr) throw new Error('AI reply JSON was invalid');
     if (!Array.isArray(arr) || !arr.length) throw new Error('AI reply was an empty list');
 
     const parsed = ingestQuestions(arr, true);
@@ -1880,5 +1947,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eaa8decca90d6',t:'MTc5MTU2MjMzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eb9d82ce0edd1',t:'MTc5MTU2Mjk2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
