@@ -415,6 +415,22 @@ AI will automatically:
             </div>
             <div class="ai-status" id="aiStatusLine">… Checking AI…</div>
             <div class="ai-test-box" id="aiTestResult" style="display:none;"></div>
+            <div class="ai-test-box" id="localAIBox" style="margin-top:12px;">
+              <b style="display:flex;align-items:center;gap:6px;color:var(--text-main);"><span class="material-symbols-rounded" style="font-size:17px;color:var(--accent-ai);">memory</span> Local AI — runs 100% in your browser (WebLLM)</b>
+              <div style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.6;">No API key · no rate limits · works fully offline after a one-time model download. Needs Chrome / Edge with WebGPU. If unavailable, the app keeps using free Cloud AI + Offline modes.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select id="localModelSelect" class="local-model-select" onchange="localStorage.setItem('tp_llm_model', this.value)">
+                  <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M — lightest (≈350 MB)</option>
+                  <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5 0.5B — quick (≈950 MB)</option>
+                  <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC" selected>Qwen2.5 1.5B — recommended (≈1.6 GB)</option>
+                  <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — best quality (≈2.3 GB)</option>
+                </select>
+                <button class="btn btn-sm btn-primary" id="localAIBtn" onclick="toggleLocalAI()"><span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI</button>
+                <button class="btn btn-sm btn-secondary hidden" id="localAITestBtn" onclick="testLocalAI()">Test</button>
+              </div>
+              <div class="local-progress" id="localAIProgressWrap"><div class="local-progress-bar" id="localAIProgress"></div></div>
+              <div id="localAIStatus" style="margin-top:8px;font-size:0.78rem;font-weight:600;color:var(--text-muted);">Not enabled — click "Enable Local AI" to download the model (one-time, then it's cached).</div>
+            </div>
           </div>
 
           <!-- MANUAL TAB -->
@@ -606,6 +622,10 @@ AI will automatically:
   .ai-ok{color:var(--success);font-weight:700;}
   .ai-warn{color:var(--warning);font-weight:700;}
   .ai-bad{color:var(--error);font-weight:700;}
+  .local-model-select{padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-main);font-family:inherit;font-size:0.8rem;font-weight:600;}
+  .local-progress{height:8px;border-radius:99px;background:var(--bg-chip);margin-top:10px;overflow:hidden;display:none;}
+  .local-progress.active{display:block;}
+  .local-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent-ai),var(--accent));transition:width .25s;border-radius:99px;}
   .type-btn{padding:7px 14px;font-size:0.78rem;font-weight:600;border-radius:50px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);cursor:pointer;font-family:inherit;}
   .type-btn.active{background:var(--accent);color:#FFF;border-color:var(--accent);}
   .q-card{background:var(--bg-section);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;margin-bottom:12px;}
@@ -652,6 +672,12 @@ window.addEventListener('DOMContentLoaded', () => {
   refreshLivePreviews();
   // default one sub-part row
   addSubPartRow();
+  // restore chosen local model
+  try {
+    const savedModel = localStorage.getItem('tp_llm_model');
+    const sel = document.getElementById('localModelSelect');
+    if (savedModel && sel && Array.from(sel.options).some(o => o.value === savedModel)) sel.value = savedModel;
+  } catch (e) {}
   // silently check whether the AI endpoint is reachable (updates the status line)
   probeAIStatus();
 });
@@ -1439,8 +1465,20 @@ async function testAIConnection() {
     out += line(false, 'AI chat API (POST)', (e && e.message) || 'network error');
   }
 
+  // 3) Local AI (WebLLM) status
+  if (!navigator.gpu) {
+    out += line(false, 'Local AI (WebLLM)', 'WebGPU not available in this browser — needs Chrome / Edge 113+. (Optional — cloud & offline still work)');
+  } else if (llmState === 'ready') {
+    out += line(true, 'Local AI (WebLLM)', `loaded: ${llmModelId} — unlimited, used before cloud`);
+  } else {
+    out += `<div>⏭️ <b>Local AI (WebLLM)</b> — not enabled (optional & unlimited). Use the "Local AI" box below to turn it on.</div>`;
+  }
+
   // verdict
-  if (getOk && postOk) {
+  if (llmState === 'ready' && llmEngine) {
+    out += `<div class="ai-ok" style="margin-top:8px;">🎉 <b>LOCAL AI is active</b> — unlimited & private. Cloud AI and Offline remain as automatic fallbacks.</div>`;
+    setAIStatus('ai', 'Local WebLLM active — unlimited, works offline');
+  } else if (getOk && postOk) {
     out += `<div class="ai-ok" style="margin-top:8px;">🎉 <b>AI is ONLINE</b> — "Process with AI" and the chatbot will use real AI.</div>`;
     setAIStatus('ai', 'full test passed — AI is online');
   } else if (getOk && !postOk) {
@@ -1509,6 +1547,132 @@ function parseAIQuestionArray(content) {
   return null;
 }
 
+/* ==================== LOCAL AI (WebLLM — in-browser, unlimited, offline) ==================== */
+let llmEngine = null;
+let llmState = 'off';          // off | loading | ready
+let llmModelId = '';
+let lastAISource = 'cloud';    // 'local' | 'cloud' — for the status line
+
+async function loadWebLLMModule() {
+  // isolated in its own function so it can be stubbed in tests
+  return import('https://esm.run/@mlc-ai/web-llm@0.2.85');
+}
+
+function setLocalAIStatus(kind, text) {
+  const el = document.getElementById('localAIStatus');
+  if (!el) return;
+  const cls = kind === 'ai' ? 'ai-ok' : (kind === 'bad' ? 'ai-bad' : (kind === 'warn' ? 'ai-warn' : ''));
+  const icon = kind === 'ai' ? '✅' : (kind === 'bad' ? '❌' : (kind === 'warn' ? '⚠️' : '⏳'));
+  el.innerHTML = `${icon} <span class="${cls}">${escapeHTML(text)}</span>`;
+}
+
+function setLocalAIProgress(frac) {
+  const wrap = document.getElementById('localAIProgressWrap');
+  const bar = document.getElementById('localAIProgress');
+  if (!wrap || !bar) return;
+  if (frac == null) { wrap.classList.remove('active'); bar.style.width = '0%'; return; }
+  wrap.classList.add('active');
+  bar.style.width = Math.max(0, Math.min(100, Math.round(frac * 100))) + '%';
+}
+
+async function toggleLocalAI() {
+  if (llmState === 'ready') return disableLocalAI();
+  return enableLocalAI();
+}
+
+async function enableLocalAI() {
+  if (llmState === 'loading') return;
+  if (!navigator.gpu) {
+    setLocalAIStatus('bad', 'This browser has no WebGPU — use Chrome / Edge 113+ for Local AI. Cloud AI & Offline still work.');
+    return;
+  }
+  llmState = 'loading';
+  const btn = document.getElementById('localAIBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+  const sel = document.getElementById('localModelSelect');
+  const modelId = (sel && sel.value) || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+  try {
+    setLocalAIStatus('info', 'Downloading model files (one-time — can take a few minutes)…');
+    setLocalAIProgress(0);
+    const mod = await loadWebLLMModule();
+    llmEngine = await mod.CreateMLCEngine(modelId, {
+      initProgressCallback: (p) => {
+        const frac = typeof p.progress === 'number' ? p.progress : 0;
+        setLocalAIProgress(frac);
+        setLocalAIStatus('info', `${Math.round(frac * 100)}% — ${String(p.text || 'loading model…').slice(0, 90)}`);
+      }
+    });
+    llmModelId = modelId;
+    llmState = 'ready';
+    setLocalAIProgress(null);
+    setLocalAIStatus('ai', `Local AI ready (${modelId.replace(/-MLC$/, '')}) — unlimited & offline-capable. It is used first; Cloud AI stays as fallback.`);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">power_settings_new</span> Turn Off'; }
+    const testBtn = document.getElementById('localAITestBtn');
+    if (testBtn) testBtn.classList.remove('hidden');
+  } catch (e) {
+    console.warn(e);
+    llmEngine = null; llmState = 'off';
+    setLocalAIProgress(null);
+    setLocalAIStatus('bad', 'Could not start Local AI: ' + ((e && e.message) || e) + ' — Cloud AI / Offline still work.');
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI'; }
+  }
+}
+
+async function disableLocalAI() {
+  try { if (llmEngine && typeof llmEngine.unload === 'function') await llmEngine.unload(); } catch (e) {}
+  llmEngine = null; llmState = 'off'; llmModelId = '';
+  setLocalAIProgress(null);
+  setLocalAIStatus('info', 'Local AI turned off.');
+  const btn = document.getElementById('localAIBtn');
+  if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI';
+  const testBtn = document.getElementById('localAITestBtn');
+  if (testBtn) testBtn.classList.add('hidden');
+}
+
+async function localChat(system, user, temperature, maxTokens) {
+  const messages = [];
+  if (system) messages.push({ role: 'system', content: system });
+  messages.push({ role: 'user', content: user });
+  const reply = await llmEngine.chat.completions.create({
+    messages,
+    temperature: temperature != null ? temperature : 0.2,
+    max_tokens: maxTokens || 2500
+  });
+  const content = reply && reply.choices && reply.choices[0] && reply.choices[0].message
+    ? reply.choices[0].message.content : '';
+  return typeof content === 'string' ? content : JSON.stringify(content || '');
+}
+
+async function testLocalAI() {
+  if (llmState !== 'ready') { setLocalAIStatus('warn', 'Local AI not loaded yet.'); return; }
+  setLocalAIStatus('info', 'Testing local model…');
+  try {
+    const t0 = Date.now();
+    const out = await localChat('', 'Reply with exactly: PONG', 0, 32);
+    setLocalAIStatus('ai', `Local model OK (${Date.now() - t0}ms) — replied "${String(out).trim().slice(0, 24)}"`);
+  } catch (e) {
+    setLocalAIStatus('bad', 'Local test failed: ' + ((e && e.message) || e));
+  }
+}
+
+/* One entry point for every AI call: LOCAL first, then Cloud, then (caller) Offline */
+async function smartAI(payload, shortPrompt) {
+  if (llmState === 'ready' && llmEngine) {
+    try {
+      const msgs = payload.messages || [];
+      const sys = msgs.filter(m => m.role === 'system').map(m => m.content).join('\n');
+      let usr = msgs.filter(m => m.role === 'user').map(m => m.content).join('\n');
+      if (usr.length > 8000) usr = usr.slice(0, 8000); // local models have ~4K token context
+      lastAISource = 'local';
+      return await localChat(sys, usr, payload.temperature, 2500);
+    } catch (e) {
+      console.warn('Local AI failed, falling back to Cloud AI', e);
+    }
+  }
+  lastAISource = 'cloud';
+  return aiRequest(payload, shortPrompt);
+}
+
 async function processWithAI() {
   const raw = document.getElementById('pasteArea').value.trim();
   if (!raw) { showSnackbar('Paste text first'); return; }
@@ -1526,11 +1690,11 @@ async function processWithAI() {
     };
     const shortPrompt = raw.length < 5200 ? (PASTE_PROMPT + '\n\nTEXT:\n' + raw) : '';
 
-    let content = await aiRequest(payload, shortPrompt);
+    let content = await smartAI(payload, shortPrompt);
     let arr = parseAIQuestionArray(content);
     if (!arr) {
       // one stricter retry — some models answer with prose around the JSON
-      const stricter = await aiRequest({
+      const stricter = await smartAI({
         model: 'openai',
         temperature: 0,
         messages: [
@@ -1547,8 +1711,9 @@ async function processWithAI() {
     if (!parsed) throw new Error('AI reply had no usable questions (unexpected format)');
     hideAI();
     const secs = ((Date.now() - t0) / 1000).toFixed(1);
-    setAIStatus('ai', `${parsed} question${parsed === 1 ? '' : 's'} parsed in ${secs}s`);
-    showSnackbar(`✨ AI added ${parsed} question${parsed === 1 ? '' : 's'} (${secs}s)`);
+    const src = lastAISource === 'local' ? 'Local AI' : 'Cloud AI';
+    setAIStatus('ai', `${parsed} question${parsed === 1 ? '' : 's'} parsed in ${secs}s (via ${src})`);
+    showSnackbar(`✨ ${src} added ${parsed} question${parsed === 1 ? '' : 's'} (${secs}s)`);
   } catch (e) {
     console.warn(e);
     hideAI();
@@ -1763,7 +1928,7 @@ async function sendChatMessage(){
     const sysMsg = CHAT_SYSTEM + '\n\nCURRENT_PAPER_STATE:\n'+JSON.stringify(stateCtx);
     // short version for the GET fallback (URL length limited)
     const shortPrompt = ('You are TestPaper Pro Co-Pilot. Be concise. Use the same ACTION TAGS as instructed.\n' + sysMsg.slice(0, 2100) + '\n\nUSER: ' + msg).slice(0, 6800);
-    const replyRaw = await aiRequest({
+    const replyRaw = await smartAI({
       model:'openai',
       temperature:0.5,
       messages:[
@@ -1947,5 +2112,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eb9d82ce0edd1',t:'MTc5MTU2Mjk2NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47ed000dc206ce7',t:'MTc5MTU2Mzg3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
