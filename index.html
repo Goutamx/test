@@ -406,6 +406,7 @@ The parser will automatically:
               <div style="display:flex;gap:6px;flex-wrap:wrap;" id="manualTypeBtns">
                 <button class="type-btn active" data-type="subjective" onclick="setManualType('subjective',this)">Subjective</button>
                 <button class="type-btn" data-type="mcq" onclick="setManualType('mcq',this)">MCQ</button>
+                <button class="type-btn" data-type="tf" onclick="setManualType('tf',this)">True/False</button>
                 <button class="type-btn" data-type="subq" onclick="setManualType('subq',this)">Sub-Parts</button>
                 <button class="type-btn" data-type="or" onclick="setManualType('or',this)">OR Choice</button>
               </div>
@@ -811,14 +812,24 @@ function autoInstructions() {
     const a = num, b = num + list.length - 1;
     const marksSet = Array.from(new Set(list.map(q => parseInt(q.marks, 10) || 1)));
     const m = marksSet[0];
-    const mcq = list.filter(q => q.type === 'mcq').length;
-    const label = mcq >= list.length / 2 ? 'Multiple Choice (MCQ)'
-      : (m >= 5 ? 'Long Answer (LA)' : (m >= 3 ? 'Short Answer (SA)' : 'Very Short Answer (VSA)'));
+    const nMcq = list.filter(q => q.type === 'mcq').length;
+    const nTf = list.filter(q => q.type === 'tf').length;
+    let label;
+    if (nMcq + nTf === list.length) {
+      const parts = [];
+      if (nMcq) parts.push('Multiple Choice (MCQ)');
+      if (nTf) parts.push('True/False');
+      label = parts.join(' and ');
+    } else if (nMcq + nTf === 0) {
+      label = m >= 5 ? 'Long Answer (LA)' : (m >= 3 ? 'Short Answer (SA)' : 'Very Short Answer (VSA)');
+    } else {
+      label = 'Mixed objective and subjective';
+    }
     let line = 'Section ' + letters[si] + ' - ' + (a === b ? 'Question No. ' + a + ' is' : 'Question Nos. ' + a + ' to ' + b + ' are') +
       ' ' + label + ' type question' + (a === b ? '' : 's') + '.';
     if (marksSet.length === 1) line += ' Each question carries ' + m + ' mark' + (m > 1 ? 's' : '') + '.';
     else line += ' Marks for each question are indicated against it.';
-    if (label !== 'Multiple Choice (MCQ)' && marksSet.length === 1) {
+    if (nMcq + nTf === 0 && marksSet.length === 1) {
       if (m === 2) line += ' Answer to these questions shall be written in 30 to 50 words.';
       else if (m === 3 || m === 4) line += ' Answer to these questions shall be written in 80 to 100 words.';
       else if (m >= 5) line += ' Answer to these questions shall be written in 120 to 150 words.';
@@ -1052,6 +1063,17 @@ function switchTab(tab) {
     b1.style.background = 'transparent'; b1.style.color = 'var(--text-muted)';
     updateSectionDropdowns();
   }
+}
+
+function setQType(sel, i) {
+  const t = sel.value;
+  const q = questions[i];
+  q.type = t;
+  if (t === 'mcq' && (!Array.isArray(q.options) || q.options.length < 2)) q.options = ['', ''];
+  if (t === 'tf' || t === 'subjective' || t === 'fill') q.options = [];
+  if (t !== 'or') q.orAlternative = null;
+  if (t !== 'subq') q.subQuestions = [];
+  saveState(); renderQuestionsList(); refreshLivePreviews();
 }
 
 function setManualType(t, btn) {
@@ -1413,7 +1435,7 @@ const PASTE_PROMPT = `You extract exam questions from messy teacher/ChatGPT text
 Each array element is one question:
 {
   "text": "clean question text without numbering, never include answers",
-  "type": "mcq" | "subjective" | "subq" | "or",
+  "type": "mcq" | "tf" | "subjective" | "subq" | "or",
   "marks": 2,
   "section": "Section A",
   "options": ["...", "...", "...", "..."],
@@ -1421,7 +1443,7 @@ Each array element is one question:
   "orAlternative": "..."
 }
 Field rules:
-- "type": "mcq" for multiple-choice (fill "options", 2-4 choices) AND for True/False statements (fill "options": ["True","False"]). "subjective" for fill-ups, short and long answers. "subq" ONLY when the source prints separate marks for each (a)/(b)/(c) part (fill "subQuestions"; "marks" MUST equal the sum of the part marks; never repeat the part texts inside "text"). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
+- "type": "mcq" ONLY for genuine multiple-choice (fill "options", 2-4 real subject choices). "tf" for True/False statements (NO "options" at all - keep the pure statement in "text"; the app prints its own True/False marker). "subjective" for fill-ups, short and long answers. "subq" ONLY when the source prints separate marks for each (a)/(b)/(c) part (fill "subQuestions"; "marks" MUST equal the sum of the part marks; never repeat the part texts inside "text"). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
 - Use only the keys that apply: "options" for mcq, "subQuestions" for subq, "orAlternative" for or. Keep "text", "type", "marks", "section" always.
 - "section": from headers like "SECTION A" / "Part B"; default "Section A". Marks from section headers (e.g. "2 marks each") or per-question marks; default 1.
 - SECTION FIDELITY (critical): a question's "section" is EXACTLY the nearest section heading printed ABOVE it in the source. Never move a question across a section boundary, never merge, split, reorder or renumber sections. If the source prints questions 1-10 under SECTION A and 11-17 under SECTION B, then question 10 belongs to Section A and question 11 to Section B - exactly as printed, with no exceptions.
@@ -1432,7 +1454,7 @@ Cleaning rules:
 - Remove numbering (Q1, 1., (2)), markdown **bold**, emojis, answer keys, explanations, tips, teacher notes.
 - "options": plain choice text WITHOUT leading letters such as "(a)", "b)", "c." — the app prints its own lettering.
 - "section": the heading name WITHOUT any marks parenthesis — e.g. "Section A" or "SECTION A: Objective Type Questions", never "...(10 Marks)".
-- True/False statements: drop any trailing "[True / False]" tag from "text" (the type+options carry that meaning).
+- True/False statements: drop any trailing "[True / False]" tag from "text" (the "tf" type carries that meaning) and set "type": "tf".
 - Keep original language of the question.
 - Never include answers in text.`;
 
@@ -1539,8 +1561,7 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
       : [];
     const rawSubs = Array.isArray(o.subQuestions) ? o.subQuestions : (Array.isArray(o.subParts) ? o.subParts : []);
     const orAlt = String(o.orAlternative || o.or || '').trim();
-    let tfType = false;
-    if (['truefalse', 'true/false', 'tf', 'true-false', 'judgement'].includes(type)) { type = 'mcq'; tfType = true; }
+    if (['truefalse', 'true/false', 'tf', 'true-false', 'judgement'].includes(type)) { type = 'tf'; }
     else if (['mcq', 'objective', 'multiple choice', 'multiple-choice'].includes(type)) type = 'mcq';
     else if (['subq', 'sub-part', 'subparts', 'multi-part', 'compound'].includes(type)) type = 'subq';
     else if (['or', 'choice', 'either or'].includes(type)) type = 'or';
@@ -1549,8 +1570,9 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
     else if (rawSubs.length >= 2) type = 'subq';
     else if (orAlt) type = 'or';
     else type = 'subjective';
-    if (type === 'subjective' && /\[\s*true\s*\/\s*false\s*\]/i.test(text)) { type = 'mcq'; tfType = true; text = text.replace(/\[\s*true\s*\/\s*false\s*\]/i, '').trim(); }
-    if (type === 'mcq' && tfType && opts.length < 2) { opts.length = 0; opts.push('True', 'False'); }
+    if (type === 'subjective' && /\[\s*true\s*\/\s*false\s*\]/i.test(text)) { type = 'tf'; text = text.replace(/\[\s*true\s*\/\s*false\s*\]/i, '').trim(); }
+    if (type === 'mcq' && opts.length === 2 && opts.map(o => String(o).trim().toLowerCase()).sort().join('|') === 'false|true') { type = 'tf'; opts.length = 0; }
+    if (type === 'tf') opts.length = 0;
     const marksRaw = parseInt(o.marks, 10) || 0;
     let section = String(o.section || 'Section A').trim() || 'Section A';
     section = section.replace(/\s*[\(\[]\s*\d+\s*marks?\s*[\)\]]\s*$/i, '').trim() || 'Section A'; // drop '(10 Marks)' from names
@@ -1684,6 +1706,8 @@ function renderQuestionsList() {
       <div class="q-bottom">
         <label>Marks</label>
         <input type="number" min="1" value="${q.marks}" ${q.type==='subq'?'disabled':''} onchange="questions[${i}].marks=parseInt(this.value)||1;saveState();refreshLivePreviews();updateSummary();" style="width:64px;">
+        <label>Type</label>
+        <select onchange="setQType(this,${i})">${[['subjective','Subjective'],['mcq','MCQ'],['tf','True/False'],['fill','Fill-up'],['subq','Sub-Parts'],['or','OR Choice']].map(([v,l])=>`<option value="${v}" ${q.type===v?'selected':''}>${l}</option>`).join('')}</select>
         <label>Section</label>
         <select onchange="changeSec(this,${i})">${secOpts}</select>
       </div>
@@ -1808,5 +1832,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48704c8fdaf96b4',t:'MTc5MTY0OTkyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48740e8d9de54cb',t:'MTc5MTY1MjM4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
