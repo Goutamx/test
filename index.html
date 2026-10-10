@@ -163,6 +163,7 @@
     .pdf-page-wrapper { padding: 0 !important; }
     .pv-question, .pv-student-box, .pv-instructions, .pv-section-title { page-break-inside: avoid; break-inside: avoid; }
     .pv-section-title { page-break-after: avoid; break-after: avoid; }
+    #finalPreview.pdf-capture > :last-child { margin-bottom: 0 !important; }
     html, body { height: auto !important; overflow: visible !important; }
     .preview-container, .preview-body, .pdf-page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; }
     #finalPreview > :last-child, #finalPreview .pv-question:last-child { margin-bottom: 0 !important; }
@@ -247,7 +248,7 @@
         </div>
         <div class="form-group">
           <label>Date of Exam</label>
-          <input type="date" id="examDate">
+          <input type="date" id="examDate" onchange="onExamDateChange()">
         </div>
         <div class="form-group">
           <label>Duration</label>
@@ -317,7 +318,7 @@
             <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfName" checked onchange="setStudentField('name',this.checked)" style="accent-color:var(--accent);">Name</label>
             <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfRoll" checked onchange="setStudentField('roll',this.checked)" style="accent-color:var(--accent);">Roll No.</label>
             <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfSection" checked onchange="setStudentField('section',this.checked)" style="accent-color:var(--accent);">Section</label>
-            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfDate" checked onchange="setStudentField('date',this.checked)" style="accent-color:var(--accent);">Date</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfDate" checked onchange="toggleCfDate(this)" style="accent-color:var(--accent);">Date</label>
             <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfInv" checked onchange="setStudentField('invigilator',this.checked)" style="accent-color:var(--accent);">Invigilator's Sign</label>
             <span style="font-size:0.72rem;color:var(--text-muted);width:100%;">All fields print as blank lines — the date stays empty even if the paper is made before the exam date is known.</span>
           </div>
@@ -548,6 +549,12 @@ The parser will automatically:
 </div>
 
 <!-- SNACKBAR -->
+<div id="busyOverlay" style="display:none;position:fixed;inset:0;background:rgba(8,10,14,0.78);backdrop-filter:blur(3px);z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:14px;cursor:wait;">
+  <div style="width:46px;height:46px;border:4px solid rgba(255,255,255,0.25);border-top-color:var(--accent);border-radius:50%;animation:busySpin 0.9s linear infinite;"></div>
+  <div id="busyText" style="font-weight:700;font-size:1.05rem;color:#fff;">AI is working on your questions…</div>
+  <div style="font-size:0.8rem;color:rgba(255,255,255,0.72);">Please wait — the page stays locked until it finishes.</div>
+</div>
+<style>@keyframes busySpin{to{transform:rotate(360deg)}}</style>
 <div id="snackbar" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);padding:12px 20px;border-radius:50px;display:flex;align-items:center;gap:10px;background:#1E293B;color:#FFF;font-size:0.9rem;font-weight:600;box-shadow:0 15px 40px rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);z-index:700;max-width:calc(100vw - 40px);">
   <div style="width:28px;height:28px;background:rgba(16,185,129,0.2);color:#34D399;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
     <span class="material-symbols-rounded" style="font-size:18px;">check</span>
@@ -610,6 +617,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // default one sub-part row
   addSubPartRow();
   try { syncLayoutUI(); } catch (e) {}
+  try {
+    if (val('examDate').trim() && appSettings.studentFields && appSettings.studentFields.date !== false) {
+      appSettings.studentFields.date = false; syncLayoutUI();
+    }
+  } catch (e) {}
   // AI settings init
   try {
     const sel = document.getElementById('geminiModelSelect');
@@ -834,6 +846,25 @@ function setAutoInstr(v) {
     ? 'Standard instructions are generated from your questions at export time, so they always match the final paper. Uncheck to write your own in the box above.'
     : 'Manual mode — whatever is in the box above prints on the paper.';
   saveSavedState(); refreshLivePreviews();
+}
+
+function onExamDateChange() {
+  // The date may live in exactly ONE place: the Details header OR the candidate box.
+  if (val('examDate').trim() && (appSettings.studentFields || {}).date !== false) {
+    appSettings.studentFields.date = false;
+    syncLayoutUI();
+    showSnackbar('Date prints from Details — blank Date line removed from the candidate box');
+  }
+  saveState(); refreshLivePreviews();
+}
+
+function toggleCfDate(el) {
+  if (el.checked && val('examDate').trim()) {
+    el.checked = false;
+    showSnackbar('Clear the Date in Details first — the paper already prints that date');
+    return;
+  }
+  setStudentField('date', el.checked);
 }
 
 function setStudentField(k, v) {
@@ -1393,6 +1424,10 @@ Field rules:
 - "type": "mcq" for multiple-choice (fill "options", 2-4 choices) AND for True/False statements (fill "options": ["True","False"]). "subjective" for fill-ups, short and long answers. "subq" ONLY when the source prints separate marks for each (a)/(b)/(c) part (fill "subQuestions"; "marks" MUST equal the sum of the part marks; never repeat the part texts inside "text"). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
 - Use only the keys that apply: "options" for mcq, "subQuestions" for subq, "orAlternative" for or. Keep "text", "type", "marks", "section" always.
 - "section": from headers like "SECTION A" / "Part B"; default "Section A". Marks from section headers (e.g. "2 marks each") or per-question marks; default 1.
+- SECTION FIDELITY (critical): a question's "section" is EXACTLY the nearest section heading printed ABOVE it in the source. Never move a question across a section boundary, never merge, split, reorder or renumber sections. If the source prints questions 1-10 under SECTION A and 11-17 under SECTION B, then question 10 belongs to Section A and question 11 to Section B - exactly as printed, with no exceptions.
+- Include EVERY question from the source. "Attempt any 5 out of 7" still means: include all 7 questions in that section.
+- Ignore mark tables, general-instruction blocks, titles, footers and any ANSWER KEY / MARKING SCHEME text - none of it is a question.
+- "marks" = the per-question marks stated in the source (heading or brackets like "(2 Marks)"), never a section total.
 Cleaning rules:
 - Remove numbering (Q1, 1., (2)), markdown **bold**, emojis, answer keys, explanations, tips, teacher notes.
 - "options": plain choice text WITHOUT leading letters such as "(a)", "b)", "c." — the app prints its own lettering.
@@ -1549,12 +1584,25 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
   return add;
 }
 
+function showBusy(msg) {
+  const o = document.getElementById('busyOverlay');
+  if (!o) return;
+  const t = document.getElementById('busyText');
+  if (msg && t) t.textContent = msg;
+  o.style.display = 'flex';
+}
+function hideBusy() {
+  const o = document.getElementById('busyOverlay');
+  if (o) o.style.display = 'none';
+}
+
 async function processWithAI() {
   const raw = (document.getElementById('pasteArea').value || '').trim();
   if (!raw) { showSnackbar('Paste some text first'); return; }
   setAIStatus('ai', (geminiKey() ? 'Gemini' : 'Site AI') + ' is reading your text…');
   const t0 = Date.now();
   const capped = raw.length > 24000 ? raw.slice(0, 24000) : raw;
+  showBusy('AI is working on your questions…');
   try {
     const reply = await geminiChat(PASTE_PROMPT + '\n\nTEXT:\n' + capped,
       'You are a precise exam-paper data extractor. You output strictly valid JSON arrays and nothing else.');
@@ -1576,6 +1624,8 @@ async function processWithAI() {
     setAIStatus('bad', `AI error: ${msg} — using offline parser instead`);
     showSnackbar('AI failed — falling back to the offline parser');
     try { processOffline(); } catch (e2) {}
+  } finally {
+    hideBusy();
   }
 }
 
@@ -1695,45 +1745,61 @@ async function downloadPDF(){
     return;
   }
   showSnackbar('Building PDF…');
-
-  // Clean off-screen capture node: exact content width, zero wrapper padding and
-  // zero trailing margins -> PDF matches the preview with NO extra blank last page.
   refreshLivePreviews();
-  const source = document.createElement('div');
-  source.id = 'pdfCapture';
-  source.style.cssText = 'position:fixed;left:-10000px;top:0;width:180mm;margin:0;padding:0;background:#fff;color:#000;';
-  source.innerHTML = '<style>#pdfCapture>:last-child{margin-bottom:0!important;}#pdfCapture .pv-question{margin-bottom:14px;}#pdfCapture .pv-question:last-child{margin-bottom:0!important;}</style>' + buildPaperHTML();
-  document.body.appendChild(source);
   await new Promise(r => setTimeout(r, 350)); // paint delay for logo/fonts
 
-  const filename = ((val('subject')||'Test').replace(/\s+/g,'_')) + '_Paper.pdf';
+  // Capture the SAME node the user sees in the preview, so the PDF can never
+  // differ from it. The pdf-capture class only strips the trailing margin.
+  const source = document.getElementById('finalPreview');
+  if (!source) { showSnackbar('Preview missing'); return; }
+  source.classList.add('pdf-capture');
 
+  const filename = ((val('subject')||'Test').replace(/\s+/g,'_')) + '_Paper.pdf';
   const opt = {
     margin: [12, 14, 12, 16],
     filename,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: {
-      scale: 3,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: '#FFFFFF',
-      logging: false,
-      letterRendering: true,
-      scrollX: 0,
-      scrollY: 0
+      scale: 3, useCORS: true, allowTaint: true,
+      backgroundColor: '#FFFFFF', logging: false,
+      letterRendering: true, scrollX: 0, scrollY: 0
     },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['css', 'legacy'], avoid: ['.pv-question', '.pv-student-box', '.pv-instructions'] }
   };
 
   try {
-    await html2pdf().set(opt).from(source).save();
+    const worker = html2pdf().set(opt).from(source).toCanvas();
+    const canvas = await worker.get('canvas');
+    // Blank-last-page guard: if the final page slice of the canvas has no ink
+    // at all, drop that page before saving.
+    let blankLast = false;
+    try {
+      const factor = canvas.width / 180;              // canvas px per mm of content width
+      const pagePx = 273 * factor;                    // usable A4 height in canvas px
+      const pages = Math.ceil(canvas.height / pagePx);
+      const top = Math.floor((pages - 1) * pagePx);
+      if (pages > 1 && canvas.height - top > 2) {
+        const d = canvas.getContext('2d').getImageData(0, top, canvas.width, canvas.height - top).data;
+        let ink = false;
+        for (let i = 0; i < d.length; i += 388) {
+          if (d[i] < 245 || d[i+1] < 245 || d[i+2] < 245) { ink = true; break; }
+        }
+        blankLast = !ink;
+      }
+    } catch (e) { console.warn('blank-page check skipped:', e); }
+    const pdf = await worker.toPdf().get('pdf');
+    if (blankLast) {
+      const n = pdf.internal.getNumberOfPages();
+      if (n > 1) pdf.deletePage(n);
+    }
+    await pdf.save(filename);
     showSnackbar('PDF downloaded!');
   } catch (e) {
     console.error(e);
     showSnackbar('PDF failed — try Print instead');
   }
-  document.body.removeChild(source);
+  source.classList.remove('pdf-capture');
 }
 
 function printPaper(){
@@ -1742,5 +1808,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a486e612ad1c91a4',t:'MTc5MTY0ODY2Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48704c8fdaf96b4',t:'MTc5MTY0OTkyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
