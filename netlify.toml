@@ -1,0 +1,12 @@
+# TestPaper Pro — Netlify config
+# Static site lives at the repo root (index.html); the AI proxy is a serverless function.
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# The Gemini key is NOT here — set it in the Netlify UI:
+#   Site configuration → Environment variables → GEMINI_API_KEY = <your free key>
+# Optional: ALLOWED_ORIGINS = https://your-site.netlify.app  (blocks other sites from using the proxy)
