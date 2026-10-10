@@ -698,7 +698,12 @@ function saveState() {
     logo: logoBase64, questions, sections, appSettings, sectionRules,
     pasteRaw: (document.getElementById('pasteArea') || {}).value || ''
   };
-  try { localStorage.setItem('tp_master_v2', JSON.stringify(data)); } catch(e) {}
+  try { localStorage.setItem('tp_master_v2', JSON.stringify(data)); } catch(e) {
+    if (!saveState._warned) {
+      saveState._warned = true;
+      try { showSnackbar('Auto-save failed — browser storage full (try a smaller logo)'); } catch (e2) {}
+    }
+  }
 }
 function saveSavedState() { saveState(); if (typeof updateSummary === 'function') updateSummary(); }
 function val(id) { const el = document.getElementById(id); return el ? el.value : ''; }
@@ -818,25 +823,30 @@ const STANDARD_INSTR_FALLBACK = [
    total count, section letters, question-number ranges, type names, marks,
    word limits, VI-note (only if the paper has images/map sections), choice line. */
 function extractSectionRules(raw) {
-  // Reads "Attempt any X out of Y" rules from the pasted source, per section.
-  // Handles headings ("SECTION C: ... (Attempt any 5 out of 7 x 3 = 15 Marks)")
-  // and mark-table rows ("| C | Attempt any 5 out of 7 x 3 Marks | 15 |").
+  // Reads per-section rules from the pasted source:
+  //  - "Attempt any X out of Y" ONLY from section heading lines or mark-table
+  //    rows (never from question text, which could mention attempts too)
+  //  - declared word limits ("Answer in 60-80 words each") for the section
+  //    whose heading precedes them
   const rules = {};
   let cur = null;
   String(raw || '').split(/\r?\n/).forEach(line => {
     const clean = line.replace(/\*/g, '').replace(/_/g, ' ');
-    const h = clean.match(/^\s*(?:#+\s*)?SECTION\s*([A-Za-z])\b/i);
+    const h = clean.match(/^\s*(?:#+\s*)?(?:SECTION|PART)\s*([A-Za-z])\b/i);
     if (h) cur = 'Section ' + h[1].toUpperCase();
     const a = clean.match(/attempt\s+(?:any\s+)?(\d+)\s+out\s+of\s+(\d+)/i);
-    if (!a) return;
-    const attempt = parseInt(a[1], 10), outOf = parseInt(a[2], 10);
-    if (!(attempt > 0) || !(outOf >= attempt)) return;
-    let key = cur;
-    if (!key) {
+    if (a) {
       const t = clean.match(/^\s*\|?\s*([A-Z])\s*\|/);
-      if (t) key = 'Section ' + t[1];
+      const letter = h ? h[1] : (t ? t[1] : null);
+      const attempt = parseInt(a[1], 10), outOf = parseInt(a[2], 10);
+      if (letter && attempt > 0 && outOf >= attempt) {
+        rules['Section ' + letter.toUpperCase()] = Object.assign(rules['Section ' + letter.toUpperCase()] || {}, { attempt, outOf });
+      }
     }
-    if (key) rules[key] = { attempt, outOf };
+    const wl = clean.match(/(?:answer in\s*|word limit[^\d]{0,12})(\d{2,3})\s*(?:-|–|to)\s*(\d{2,3})\s*words/i);
+    if (wl && cur) {
+      rules[cur] = Object.assign(rules[cur] || {}, { words: [parseInt(wl[1], 10), parseInt(wl[2], 10)] });
+    }
   });
   return rules;
 }
@@ -877,6 +887,7 @@ function autoInstructions() {
     const a = num, b = num + list.length - 1;
     const marksSet = Array.from(new Set(list.map(q => parseInt(q.marks, 10) || 1)));
     const m = marksSet[0];
+    const rule = getRule(sec);
     const nMcq = list.filter(q => q.type === 'mcq').length;
     const nTf = list.filter(q => q.type === 'tf').length;
     let label;
@@ -895,11 +906,12 @@ function autoInstructions() {
     if (marksSet.length === 1) line += ' Each question carries ' + m + ' mark' + (m > 1 ? 's' : '') + '.';
     else line += ' Marks for each question are indicated against it.';
     if (nMcq + nTf === 0 && marksSet.length === 1) {
-      if (m === 2) line += ' Answer to these questions shall be written in 30 to 50 words.';
+      const wl = rule && Array.isArray(rule.words) ? rule.words : null;
+      if (wl) line += ' Answer to these questions shall be written in ' + wl[0] + ' to ' + wl[1] + ' words.';
+      else if (m === 2) line += ' Answer to these questions shall be written in 30 to 50 words.';
       else if (m === 3 || m === 4) line += ' Answer to these questions shall be written in 80 to 100 words.';
       else if (m >= 5) line += ' Answer to these questions shall be written in 120 to 150 words.';
     }
-    const rule = getRule(sec);
     if (rule && rule.attempt && rule.attempt < list.length) {
       line += ' Attempt any ' + rule.attempt + ' out of ' + list.length + ' questions in this section.';
     }
@@ -1272,6 +1284,7 @@ function preprocess(raw) {
   t = t.replace(/```[\s\S]*?```/g,'');
   t = t.replace(/^#{1,6}\s+/gm,'');
   t = t.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*\n]+)\*/g,'$1');
+  t = t.replace(/^\s*>\s?/gm, '');   // markdown quote prefixes
   t = t.replace(/^[\-*_]{3,}\s*$/gm,'');
   t = t.replace(/^\s*\|.*\|\s*$/gm,''); // tables
   t = t.replace(/^\s*\|?[\s\-:|]+\|?\s*$/gm,'');
@@ -1301,6 +1314,8 @@ function processOffline() {
   const lines = text.split('\n');
   let curSec = sections[0] || 'Section A';
   let pendingMarks = null;
+  let curTf = false;
+  let started = false;   // ignore unnumbered preamble (titles etc.) before first heading/question
   let buf = null;
   const out = [];
 
@@ -1320,7 +1335,8 @@ function processOffline() {
     // OR
     const orParts = rawQ.split(/\n\s*OR\s*\n/i);
     if (orParts.length >= 2) {
-      let a = orParts[0].trim(), b = orParts[1].trim();
+      const cleanPart = (x) => x.replace(/^\s*>\s?/gm, '').replace(/^\(([ab])\)\s*/gmi, '').replace(/\(internal choice[^)]*\)/i, '').trim();
+      let a = cleanPart(orParts[0]), b = cleanPart(orParts[1]);
       const mm = a.match(/[\(\[\{]\s*(\d{1,2})\s*(?:marks?)?\s*[\)\]\}]\s*$/i);
       if (mm) { marks = parseInt(mm[1],10); a = a.replace(/[\(\[\{]\s*\d{1,2}\s*(?:marks?)?\s*[\)\]\}]\s*$/i,'').trim(); }
       b = b.replace(/[\(\[\{]\s*\d{1,2}\s*(?:marks?)?\s*[\)\]\}]\s*$/i,'').trim();
@@ -1387,8 +1403,10 @@ function processOffline() {
     }
     if (type !== 'mcq') {
       if (/true\s*(or|\/)\s*false/i.test(rawQ)) type = 'tf';
+      else if (buf.tf) type = 'tf';
       else if (/_{3,}/.test(rawQ)) type = 'fill';
     }
+    if (type === 'tf') rawQ = rawQ.replace(/[\[\(]\s*true\s*\/\s*false\s*[\]\)]/i, '').trim();
 
     out.push(makeQ(rawQ, marks, type, options, [], null, buf.sec));
     buf = null;
@@ -1403,13 +1421,16 @@ function processOffline() {
   }
 
   const secRe = /^\s*(SECTION|PART|GROUP)\s+([A-Z0-9][A-Z0-9\s\-]*)/i;
-  const secMarkRe = /(\d{1,2})\s*[\-]?\s*MARK|\(\s*(\d{1,2})\s*(?:marks?|m)?(?:\s*each)?\s*\)/i;
+  const secMarkRe = /×\s*(\d{1,2})\s*=|(\d{1,2})\s*marks?\s*(?:each|per question)|\(\s*(\d{1,2})\s*marks?\s*\)|(\d{1,2})\s*[-–]\s*mark/i;
   const qRe = /^\s*(?:Q(?:uestion)?\.?\s*)?(\d+|[ivxIVX]+)\s*[\.\)\:\-]\s*(.*)$/i;
 
   for (const line of lines) {
     const L = line.trim(); if (!L) continue;
     // stop if answer key sneaks through
     if (/^(ANSWER\s*KEY|MARKING\s*SCHEME|FILL\-?UPS?)/i.test(L)) break;
+    // paper metadata / word-limit notes are not questions (rules already read from raw)
+    if (/^\(?\s*(?:answer in|word limit)/i.test(L)) continue;
+    if (/^(?:time allowed|maximum marks|max\.? marks|subject\s*:|class\s*:|duration\s*:|total questions)/i.test(L)) continue;
 
     const sm = L.match(secRe);
     if (sm && L.length < 90) {
@@ -1420,19 +1441,34 @@ function processOffline() {
       if (short) name = short[1].charAt(0).toUpperCase() + short[1].slice(1).toLowerCase() + ' ' + short[2].toUpperCase();
       if (!sections.includes(name)) sections.push(name);
       curSec = name;
+      curTf = false;
+      started = true;
       const mm = L.match(secMarkRe);
-      pendingMarks = mm ? parseInt(mm[1] || mm[2], 10) : null;
+      pendingMarks = mm ? parseInt(mm[1] || mm[2] || mm[3] || mm[4], 10) : null;
+      continue;
+    }
+
+    // sub-headings like "II. True or False (1 Mark each)" / "I. Multiple Choice
+    // Questions (1 Mark each)" set context instead of becoming fake questions
+    const sh = L.match(/^(?:[ivxIVX]+|\d+)[\.\)\:]-?\s+(.{0,80})$/i);
+    const isTfTag = /[\[\(]\s*true\s*\/\s*false\s*[\]\)]/i.test(L);
+    if (sh && !isTfTag && /(marks?\s*each|true\s*(?:or|\/)\s*false|false\s*(?:or|\/)\s*true|multiple choice|objective type|objective questions)/i.test(sh[1]) && !/\?/.test(L) && L.length < 80) {
+      commit();
+      curTf = /true\s*(?:or|\/)\s*false/i.test(sh[1]);
+      const pm = sh[1].match(/(\d{1,2})\s*marks?/i);
+      if (pm) pendingMarks = parseInt(pm[1], 10);
       continue;
     }
 
     const qm = L.match(qRe);
     if (qm) {
       commit();
-      buf = { sec: curSec, raw: qm[2] || L, pm: pendingMarks };
+      started = true;
+      buf = { sec: curSec, raw: qm[2] || L, pm: pendingMarks, tf: curTf };
     } else if (buf) {
       buf.raw += '\n' + L;
-    } else {
-      buf = { sec: curSec, raw: L, pm: pendingMarks };
+    } else if (started) {
+      buf = { sec: curSec, raw: L, pm: pendingMarks, tf: curTf };
     }
   }
   commit();
@@ -1880,10 +1916,15 @@ async function downloadPDF(){
       const pages = Math.ceil(canvas.height / pagePx);
       const top = Math.floor((pages - 1) * pagePx);
       if (pages > 1 && canvas.height - top > 2) {
-        const d = canvas.getContext('2d').getImageData(0, top, canvas.width, canvas.height - top).data;
+        const img = canvas.getContext('2d').getImageData(0, top, canvas.width, canvas.height - top);
+        const d = img.data, wpx = img.width, hpx = img.height;
         let ink = false;
-        for (let i = 0; i < d.length; i += 388) {
-          if (d[i] < 245 || d[i+1] < 245 || d[i+2] < 245) { ink = true; break; }
+        outer:
+        for (let y = 0; y < hpx; y += 2) {          // every 2nd ROW ...
+          for (let x = 0; x < wpx; x += 24) {       // ... every 24th column
+            const k = (y * wpx + x) << 2;
+            if (d[k] < 245 || d[k+1] < 245 || d[k+2] < 245) { ink = true; break outer; }
+          }
         }
         blankLast = !ink;
       }
@@ -1908,5 +1949,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4878286d9b0918a',t:'MTc5MTY1NTA3MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4879fdd2befd97b',t:'MTc5MTY1NjI3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
