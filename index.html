@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TestPaper Pro — Universal AI Exam Co-Pilot</title>
+<title>TestPaper Pro — Exam Paper Builder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&display=swap" rel="stylesheet">
@@ -115,8 +115,6 @@
   .btn-sm { padding: 8px 14px; font-size: 0.8rem; }
   .btn-row { display: flex; justify-content: space-between; margin-top: 22px; gap: 12px; flex-wrap: wrap; }
 
-  .btn-ai { background: linear-gradient(135deg, #8B5CF6 0%, #2563EB 100%); color: #FFF; box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35); position: relative; overflow: hidden; }
-  .btn-ai:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(139, 92, 246, 0.5); }
 
   /* ==================== INFO & POPOVERS ==================== */
   .info-circle-btn { width: 20px; height: 20px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
@@ -126,24 +124,6 @@
   .popover-box.active { display: block; animation: fadeIn 0.2s ease; }
   .popover-header { display: flex; justify-content: space-between; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--border-color); padding-bottom: 6px; margin-bottom: 8px; }
   .popover-header button { background: none; border: none; cursor: pointer; color: var(--text-muted); font-weight: 700; }
-
-  /* ==================== FLOATING AI CHATBOT ==================== */
-  .chatbot-fab { position: fixed; bottom: 24px; right: 24px; z-index: 400; width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-ai), var(--accent)); color: #FFF; box-shadow: 0 10px 25px rgba(139, 92, 246, 0.4); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s; }
-  .chatbot-fab:hover { transform: scale(1.05); }
-  .chatbot-panel { position: fixed; bottom: 100px; right: 24px; z-index: 400; width: 380px; max-width: calc(100vw - 48px); height: 550px; max-height: calc(100vh - 120px); background: var(--bg-card); border-radius: var(--radius-xl); box-shadow: 0 15px 45px rgba(0,0,0,0.2); border: 1px solid var(--border-color); display: none; flex-direction: column; overflow: hidden; transform-origin: bottom right; animation: scaleIn 0.2s ease; }
-  .chatbot-panel.active { display: flex; }
-  @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-
-  .chat-header { background: linear-gradient(135deg, var(--accent-ai), var(--accent)); color: #FFF; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; }
-  .chat-header h3 { font-size: 1rem; display: flex; align-items: center; gap: 8px; font-weight: 700; }
-  .chat-body { flex: 1; padding: 16px; overflow-y: auto; background: var(--bg-main); display: flex; flex-direction: column; gap: 12px; }
-  .chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 0.88rem; line-height: 1.45; word-wrap: break-word; }
-  .chat-msg.bot { background: var(--bg-card); border: 1px solid var(--border-color); align-self: flex-start; border-bottom-left-radius: 4px; }
-  .chat-msg.user { background: var(--accent); color: #FFF; align-self: flex-end; border-bottom-right-radius: 4px; }
-
-  .chat-input-area { padding: 12px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; gap: 8px; align-items: flex-end; }
-  .chat-input-area textarea { flex: 1; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.88rem; outline: none; resize: none; background: var(--bg-input); font-family: inherit; max-height: 100px; }
-  .chat-input-area button { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--accent-ai); color: #FFF; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
   /* ==================== HIGH-RES PDF & ALIGNMENT STYLES ==================== */
   .preview-container { background: var(--bg-card); border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-soft); position: sticky; top: 90px; border: 1px solid var(--border-color); }
@@ -172,8 +152,8 @@
   /* ==================== RESPONSIVE & PRINT ==================== */
   @media print {
     body, html { background: #FFFFFF !important; }
-    .topbar, .stepper, .btn-row, .no-print, .chatbot-fab, .chatbot-panel,
-    #welcomeModal, #aiOverlay, #snackbar { display: none !important; }
+    .topbar, .stepper, .btn-row, .no-print,
+    #welcomeModal, #snackbar { display: none !important; }
     .main { max-width: 100% !important; padding: 0 !important; }
     .step-page { display: none !important; }
     #page4 { display: block !important; }
@@ -189,13 +169,11 @@
   @media (max-width: 980px) {
     #step3Split { grid-template-columns: 1fr !important; }
     .preview-container { position: static !important; }
-    .chatbot-panel { width: calc(100vw - 32px); right: 16px; bottom: 85px; height: 60vh; }
-    .chatbot-fab { bottom: 16px; right: 16px; width: 55px; height: 55px; }
   }
 
   /* Various dynamic states */
   #snackbar.show { opacity: 1 !important; transform: translateX(-50%) translateY(0) !important; }
-  #welcomeModal.active, #aiOverlay.active { display: flex !important; }
+  #welcomeModal.active { display: flex !important; }
 </style>
 </head>
 <body>
@@ -218,24 +196,6 @@
   <button class="step-item" data-step="3" onclick="goStep(3)"><div class="step-circle">3</div><span>Questions</span></button>
   <div class="step-line"></div>
   <button class="step-item" data-step="4" onclick="goStep(4)"><div class="step-circle">4</div><span>Export</span></button>
-</div>
-
-<!-- FLOATING CHATBOT UI -->
-<div class="chatbot-fab no-print" onclick="toggleChatbot()">
-  <span class="material-symbols-rounded" style="font-size:32px;">smart_toy</span>
-</div>
-<div class="chatbot-panel no-print" id="chatbotPanel">
-  <div class="chat-header">
-    <h3><span class="material-symbols-rounded">smart_toy</span> AI Co-Pilot</h3>
-    <button onclick="toggleChatbot()" style="background:none;border:none;color:#FFF;cursor:pointer;"><span class="material-symbols-rounded">close</span></button>
-  </div>
-  <div class="chat-body" id="chatBody">
-    <div class="chat-msg bot">Hi! I am your Universal Exam Co-Pilot. You can ask me to: <br>• Add or delete questions<br>• Rewrite or translate text<br>• Change school details<br>• Update instructions<br>What can I do for you today?</div>
-  </div>
-  <div class="chat-input-area">
-    <textarea id="chatInput" rows="1" placeholder="Type a command..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
-    <button onclick="sendChatMessage()"><span class="material-symbols-rounded">send</span></button>
-  </div>
 </div>
 
 <div class="main">
@@ -362,24 +322,24 @@
                 <h2>Add Questions</h2>
                 <button class="info-circle-btn" onclick="openPopover('popover-ai', this)">i</button>
               </div>
-              <p class="subtitle">Paste from ChatGPT / Word / PDF. AI cleans it perfectly.</p>
+              <p class="subtitle">Paste from ChatGPT / Word / PDF — questions are detected automatically.</p>
             </div>
           </div>
 
           <div class="popover-box" id="popover-ai">
-            <div class="popover-header"><span>AI Smart Paste</span><button onclick="closePopovers()">✕</button></div>
-            <p><b>Just paste anything.</b> AI will:</p>
+            <div class="popover-header"><span>Smart Paste</span><button onclick="closePopovers()">✕</button></div>
+            <p><b>Just paste anything.</b> The parser will:</p>
             <p>✅ Remove markdown, answers, answer keys</p>
             <p>✅ Detect MCQs, T/F, Fill-ups, Sub-parts, OR</p>
             <p>✅ Assign correct marks from section headers</p>
             <p>✅ Stop at "ANSWER KEY" automatically</p>
-            <p style="margin-top:8px;color:var(--text-muted);">Works online (AI) + offline (regex fallback).</p>
+            <p style="margin-top:8px;color:var(--text-muted);">Works 100% offline — no internet needed.</p>
           </div>
 
           <!-- Tabs -->
           <div style="display:flex;gap:6px;background:var(--bg-input);border-radius:50px;padding:4px;width:fit-content;margin-bottom:16px;">
             <button id="tabPasteBtn" onclick="switchTab('paste')" style="padding:8px 16px;border:none;border-radius:50px;background:var(--bg-card);color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
-              <span class="material-symbols-rounded" style="font-size:16px;">auto_awesome</span> AI Paste
+              <span class="material-symbols-rounded" style="font-size:16px;">content_paste</span> Paste Text
             </button>
             <button id="tabManualBtn" onclick="switchTab('manual')" style="padding:8px 16px;border:none;border-radius:50px;background:transparent;color:var(--text-muted);font-weight:600;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
               <span class="material-symbols-rounded" style="font-size:16px;">edit_note</span> Manual
@@ -395,52 +355,47 @@
               </div>
               <textarea id="pasteArea" rows="12" placeholder="Paste ChatGPT / Word / PDF text here...
 
-AI will automatically:
+The parser will automatically:
 • Strip markdown and emojis
 • Remove answer keys and tips
 • Detect sections and marks
 • Build clean questions"></textarea>
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-              <button class="btn btn-ai" onclick="processWithAI()">
+              <button class="btn btn-primary" onclick="processWithAI()">
                 <span class="material-symbols-rounded">auto_awesome</span> Process with AI
               </button>
               <button class="btn btn-secondary" onclick="processOffline()">
-                <span class="material-symbols-rounded">bolt</span> Offline Mode
+                <span class="material-symbols-rounded">bolt</span> Parse Questions
               </button>
               <button class="btn btn-secondary" onclick="testAIConnection()">
                 <span class="material-symbols-rounded">network_check</span> Test AI
               </button>
               <button class="btn btn-secondary" onclick="document.getElementById('pasteArea').value=''">Clear</button>
             </div>
-            <div class="ai-status" id="aiStatusLine">… Checking AI…</div>
+            <div class="ai-status" id="aiStatusLine"></div>
             <div class="ai-test-box" id="aiTestResult" style="display:none;"></div>
-            <div class="ai-test-box" id="localAIBox" style="margin-top:12px;">
-              <b style="display:flex;align-items:center;gap:6px;color:var(--text-main);"><span class="material-symbols-rounded" style="font-size:17px;color:var(--accent-ai);">memory</span> Local AI — runs 100% in your browser (WebLLM)</b>
-              <div style="font-size:0.76rem;color:var(--text-muted);margin:6px 0 10px;line-height:1.6;">No API key · no rate limits · works fully offline after a one-time model download. Needs Chrome / Edge with WebGPU. If unavailable, the app keeps using free Cloud AI + Offline modes.</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <select id="localModelSelect" class="local-model-select" onchange="localStorage.setItem('tp_llm_model', this.value)">
-                  <option value="SmolLM2-360M-Instruct-q4f16_1-MLC">SmolLM2 360M — lightest (≈350 MB)</option>
-                  <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5 0.5B — quick (≈950 MB)</option>
-                  <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC" selected>Qwen2.5 1.5B — recommended (≈1.6 GB)</option>
-                  <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — best quality (≈2.3 GB)</option>
+            <details class="ai-test-box" style="margin-top:12px;">
+              <summary style="cursor:pointer;font-weight:700;">⚙️ AI Settings (Google Gemini — free)</summary>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+                <select id="geminiModelSelect" class="local-model-select" onchange="localStorage.setItem('tp_gemini_model', this.value); setAIStatus('info','Model set to '+this.value);">
+                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — fastest (default)</option>
+                  <option value="gemini-3.5-flash">Gemini 3.5 Flash — better quality</option>
+                  <option value="gemini-flash-lite-latest">Flash-Lite Latest — auto-updating</option>
                 </select>
-                <button class="btn btn-sm btn-primary" id="localAIBtn" onclick="toggleLocalAI()"><span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI</button>
-                <button class="btn btn-sm btn-secondary hidden" id="localAITestBtn" onclick="testLocalAI()">Test</button>
               </div>
-              <div class="local-progress" id="localAIProgressWrap"><div class="local-progress-bar" id="localAIProgress"></div></div>
-              <div id="localAIStatus" style="margin-top:8px;font-size:0.78rem;font-weight:600;color:var(--text-muted);">Not enabled — click "Enable Local AI" to download the model (one-time, then it's cached).</div>
-              <details style="margin-top:10px;">
-                <summary style="cursor:pointer;font-size:0.76rem;font-weight:700;color:var(--text-muted);">"Unable to find a compatible GPU"? — fix checklist</summary>
-                <ul style="margin:8px 0 0 18px;font-size:0.76rem;color:var(--text-muted);line-height:1.9;">
-                  <li><b>Browser:</b> use the latest <b>Chrome</b> or <b>Edge</b>. Firefox & Safari have incomplete WebGPU support.</li>
-                  <li><b>Hardware acceleration:</b> browser Settings → System → "Use hardware acceleration" must be <b>ON</b> (restart the browser after changing it).</li>
-                  <li><b>Graphics drivers:</b> update your GPU driver (Windows: Settings → Windows Update).</li>
-                  <li><b>Remote desktop / VM / school lab thin client:</b> these usually expose no GPU to the browser — Local AI won't run there; Cloud AI & Offline cover you.</li>
-                  <li><b>Check your status:</b> open <b>chrome://gpu</b> in the address bar — "WebGPU" should say <i>Hardware accelerated</i>; or visit <b>webgpureport.org</b>.</li>
-                </ul>
-              </details>
-            </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+                <input id="geminiKeyInput" type="password" placeholder="Your own API key (optional)" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-main);font-family:inherit;font-size:0.8rem;">
+                <button class="btn btn-sm btn-primary" onclick="saveGeminiSettings()">Save</button>
+                <button class="btn btn-sm btn-secondary" onclick="testAIConnection()">Test</button>
+              </div>
+              <div style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">
+                <b>Zero setup:</b> AI runs through this site's own server proxy, so no key is needed and none is stored
+                in the page. Optionally paste <i>your own</i> free key (from <b>aistudio.google.com</b>, 2 minutes, no card)
+                to use your quota instead — it stays in this browser only and is sent only to Google. If AI is ever
+                unavailable or a free daily quota runs out, the app automatically falls back to the offline parser.
+              </div>
+            </details>
           </div>
 
           <!-- MANUAL TAB -->
@@ -588,35 +543,22 @@ AI will automatically:
 <!-- WELCOME MODAL -->
 <div id="welcomeModal" style="position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;">
   <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:28px;max-width:480px;width:100%;box-shadow:0 25px 50px rgba(0,0,0,0.3);border:1px solid var(--border-color);max-height:90vh;overflow-y:auto;">
-    <div style="background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(37,99,235,0.15));color:var(--accent-ai);font-size:0.76rem;font-weight:700;padding:5px 14px;border-radius:50px;display:inline-block;">✨ Universal AI Co-Pilot</div>
-    <h2 style="font-size:1.3rem;font-weight:800;margin-top:10px;line-height:1.3;">Build Perfect Exam Papers by Chatting</h2>
-    <p style="color:var(--text-muted);font-size:0.86rem;margin:10px 0 16px;line-height:1.55;">Paste messy ChatGPT text, or just tell the purple AI button what to do.</p>
+    <div style="background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(37,99,235,0.15));color:var(--accent-ai);font-size:0.76rem;font-weight:700;padding:5px 14px;border-radius:50px;display:inline-block;">📋 Exam Paper Builder</div>
+    <h2 style="font-size:1.3rem;font-weight:800;margin-top:10px;line-height:1.3;">Build Perfect Exam Papers in Minutes</h2>
+    <p style="color:var(--text-muted);font-size:0.86rem;margin:10px 0 16px;line-height:1.55;">Paste messy text from anywhere — questions, marks and choices are detected automatically.</p>
     <div style="display:flex;flex-direction:column;gap:12px;font-size:0.84rem;">
       <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">1</div><div><b>Details:</b> Empty fields stay hidden on PDF.</div></div>
-      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">2</div><div><b>Instructions:</b> Or ask AI: "Set CBSE instructions".</div></div>
-      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">3</div><div><b>Questions:</b> Paste anything. AI cleans answers + markdown.</div></div>
+      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">2</div><div><b>Instructions:</b> Type them or load a ready-made template.</div></div>
+      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">3</div><div><b>Questions:</b> Paste anything — the parser cleans it automatically.</div></div>
       <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">4</div><div><b>Export:</b> HD PDF that stays sharp when zoomed.</div></div>
     </div>
     <p style="margin-top:14px;font-size:0.78rem;color:var(--text-muted);background:var(--bg-section);padding:8px 12px;border-radius:8px;display:flex;gap:6px;align-items:center;">
-      <span class="material-symbols-rounded" style="font-size:16px;color:var(--accent-ai);">smart_toy</span>
-      Click the purple button anytime. Try: "Delete all questions" or "Add 3 MCQs on Harappa".
+      <span class="material-symbols-rounded" style="font-size:16px;color:var(--accent);">tips_and_updates</span>
+      Tip: click "Load Messy Sample" on the Questions step to see how the paste parser works.
     </p>
     <button class="btn btn-primary" style="width:100%;margin-top:18px;" onclick="dismissWelcome()">Let's Go <span class="material-symbols-rounded">arrow_forward</span></button>
   </div>
 </div>
-
-<!-- AI OVERLAY -->
-<div id="aiOverlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);z-index:600;display:none;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--bg-card);border-radius:var(--radius-xl);padding:32px;max-width:400px;width:100%;text-align:center;border:1px solid var(--border-color);">
-    <div style="width:70px;height:70px;margin:0 auto 20px;position:relative;">
-      <div style="position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,var(--accent-ai),var(--accent),var(--accent-ai));animation:spin 1.2s linear infinite;"></div>
-      <div style="position:absolute;inset:6px;background:var(--bg-card);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;">✨</div>
-    </div>
-    <div id="aiStatusTitle" style="font-size:1.1rem;font-weight:800;margin-bottom:6px;">AI working...</div>
-    <div id="aiStatusDesc" style="font-size:0.85rem;color:var(--text-muted);line-height:1.5;">Please wait.</div>
-  </div>
-</div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- SNACKBAR -->
 <div id="snackbar" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);padding:12px 20px;border-radius:50px;display:flex;align-items:center;gap:10px;background:#1E293B;color:#FFF;font-size:0.9rem;font-weight:600;box-shadow:0 15px 40px rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);z-index:700;max-width:calc(100vw - 40px);">
@@ -627,15 +569,12 @@ AI will automatically:
 </div>
 
 <style>
-  .ai-status{margin-top:12px;font-size:0.8rem;font-weight:600;color:var(--text-muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .ai-status{margin-top:12px;font-size:0.82rem;font-weight:600;color:var(--text-muted);}
   .ai-test-box{margin-top:10px;padding:12px 14px;border-radius:10px;background:var(--bg-section);border:1px solid var(--border-color);font-size:0.8rem;line-height:1.8;color:var(--text-main);}
   .ai-ok{color:var(--success);font-weight:700;}
   .ai-warn{color:var(--warning);font-weight:700;}
   .ai-bad{color:var(--error);font-weight:700;}
   .local-model-select{padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-main);font-family:inherit;font-size:0.8rem;font-weight:600;}
-  .local-progress{height:8px;border-radius:99px;background:var(--bg-chip);margin-top:10px;overflow:hidden;display:none;}
-  .local-progress.active{display:block;}
-  .local-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent-ai),var(--accent));transition:width .25s;border-radius:99px;}
   .type-btn{padding:7px 14px;font-size:0.78rem;font-weight:600;border-radius:50px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);cursor:pointer;font-family:inherit;}
   .type-btn.active{background:var(--accent);color:#FFF;border-color:var(--accent);}
   .q-card{background:var(--bg-section);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;margin-bottom:12px;}
@@ -682,14 +621,16 @@ window.addEventListener('DOMContentLoaded', () => {
   refreshLivePreviews();
   // default one sub-part row
   addSubPartRow();
-  // restore chosen local model
+  // AI settings init
   try {
-    const savedModel = localStorage.getItem('tp_llm_model');
-    const sel = document.getElementById('localModelSelect');
-    if (savedModel && sel && Array.from(sel.options).some(o => o.value === savedModel)) sel.value = savedModel;
+    const sel = document.getElementById('geminiModelSelect');
+    if (sel) sel.value = geminiModel();
+    const kIn = document.getElementById('geminiKeyInput');
+    if (kIn) kIn.value = geminiKey();
+    setAIStatus(geminiKey() ? 'ai' : 'info', geminiKey()
+      ? 'Gemini AI ready — "Process with AI" uses it; offline parser is the fallback'
+      : 'Site AI proxy in use (zero setup) — the offline parser is the automatic fallback');
   } catch (e) {}
-  // silently check whether the AI endpoint is reachable (updates the status line)
-  probeAIStatus();
 });
 
 function dismissWelcome() {
@@ -716,12 +657,6 @@ function showSnackbar(msg) {
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2800);
 }
-function showAI(title, desc) {
-  document.getElementById('aiStatusTitle').textContent = title;
-  document.getElementById('aiStatusDesc').innerHTML = desc;
-  document.getElementById('aiOverlay').classList.add('active');
-}
-function hideAI() { document.getElementById('aiOverlay').classList.remove('active'); }
 
 function escapeHTML(s) {
   if (s === null || s === undefined) return '';
@@ -995,7 +930,7 @@ function refreshLivePreviews() {
 </script>
 <script>
 /* =========================================================
-   PART 3 — AI, OFFLINE PARSER, MANUAL, LIST, CHATBOT, PDF
+   PART 3 — PASTE PARSER, MANUAL, LIST, PDF
    ========================================================= */
 
 /* ---------- TABS / MANUAL UI ---------- */
@@ -1312,8 +1247,7 @@ function processOffline() {
   questions = questions.concat(add);
   document.getElementById('questionsListCard').style.display = 'block';
   saveState(); updateSectionDropdowns(); renderQuestionsList(); refreshLivePreviews();
-  setAIStatus('offline', `${add.length} question${add.length === 1 ? '' : 's'} parsed without AI`);
-  showSnackbar(`⚡ Offline: added ${add.length} question${add.length === 1 ? '' : 's'}`);
+  showSnackbar(`✅ Parsed ${add.length} question${add.length === 1 ? '' : 's'}`);
 }
 
 function loadMessySample() {
@@ -1347,462 +1281,244 @@ Fill-ups: 21-Urban
 > Tip: include examples`;
 }
 
-/* ---------- AI PASTE (CORS-FRIENDLY) ---------- */
-const PASTE_PROMPT = `You extract exam questions from messy teacher/ChatGPT text.
-Return ONLY a JSON array (no markdown fences, no explanation). Each item MUST use EXACTLY these keys:
-{"text":"...","marks":1,"type":"subjective|mcq|tf|fill|subq|or","options":[],"subQuestions":[{"label":"a","text":"...","marks":1}],"orAlternative":null,"section":"Section A"}
-RULES:
-- Put the question wording in the key "text". NEVER use a key named "question" or "q".
-- Ignore titles, preambles, tips, ANSWER KEY, tables, fill-up keys, solutions.
-- Keep only real questions.
-- For (a)(b)(c) with own marks -> type subq.
-- For a/b/c/d choices without per-option marks -> mcq.
-- Section headers like "SECTION D: 2-MARK" set section + default marks.
-- Never include answers in text.`;
+/* ---------- AI ENGINE: Google Gemini (zero setup for teachers) ---------- */
+/* NO API KEY IN SOURCE — GitHub secret scanning is right to block it, and the key
+   must never be committed. The key lives server-side in the Netlify function proxy
+   (env var GEMINI_API_KEY), so browsers never see it. A teacher may still paste their
+   own free key in ⚙️ AI Settings (stored in their browser only) to override the proxy. */
+const GEMINI_DEFAULT_KEY = '';
+const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+const GEMINI_PROXY_URL = '/netlify/functions/gemini';
 
-/* ---------- SHARED AI REQUEST (retry + POST first, GET fallback) ---------- */
-async function aiRequest(payload, shortPrompt) {
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const RETRY_HTTP = /\b(402|429|500|502|503|504)\b/; // 402 = free-tier rate limit
-  let lastErr = null;
-
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch('https://text.pollinations.ai/openai?referrer=testpaper-pro', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      let content = data.choices?.[0]?.message?.content || data.content || data.text || '';
-      // reasoning models sometimes put the whole answer in "reasoning" and leave content empty
-      if ((!content || !String(content).trim()) && data.choices?.[0]?.message?.reasoning) {
-        content = data.choices[0].message.reasoning;
-      }
-      if (typeof content !== 'string') content = JSON.stringify(content);
-      return content;
-    } catch (e) {
-      lastErr = e;
-      const origMsg = String((e && e.message) || e);
-      const isRate = RETRY_HTTP.test(origMsg);
-      const isNet = (e && e.name === 'TypeError') || /fetch|network|Failed/i.test(origMsg);
-      // friendly messages instead of cryptic HTTP codes
-      if (/HTTP 402/.test(origMsg)) { try { e.message = 'AI busy — free tier rate limit (try again in a minute)'; } catch (_) {} }
-      else if (/HTTP 429/.test(origMsg)) { try { e.message = 'AI busy — too many requests'; } catch (_) {} }
-      const canRetry = (isRate && attempt < 2) || (isNet && attempt < 1);
-      if (!canRetry) break;
-      const wait = attempt === 0 ? 5000 : 12000; // rate-limit window needs longer gaps
-      const desc = document.getElementById('aiStatusDesc');
-      if (desc && document.getElementById('aiOverlay') && document.getElementById('aiOverlay').classList.contains('active')) {
-        desc.textContent = `AI is busy (rate limit${isNet ? ' / network' : ''}) — retrying in ${wait / 1000}s…`;
-      }
-      await sleep(wait);
-    }
-  }
-
-  // GET fallback (short prompts only — different rate-limit bucket)
-  if (shortPrompt) {
-    const encoded = encodeURIComponent(shortPrompt);
-    if (encoded.length < 7000) {
-      try {
-        const res2 = await fetch('https://text.pollinations.ai/' + encoded + '?referrer=testpaper-pro');
-        if (!res2.ok) throw new Error('HTTP ' + res2.status);
-        return await res2.text();
-      } catch (e2) { lastErr = lastErr || e2; }
-    }
-  }
-  throw lastErr || new Error('AI unreachable');
+function geminiKey() {
+  try { return (localStorage.getItem('tp_gemini_key') || '').trim() || GEMINI_DEFAULT_KEY; }
+  catch (e) { return GEMINI_DEFAULT_KEY; }
 }
-
-/* ---------- AI STATUS LINE (always visible so you can tell AI vs Offline) ---------- */
+function geminiModel() {
+  try { return localStorage.getItem('tp_gemini_model') || GEMINI_DEFAULT_MODEL; }
+  catch (e) { return GEMINI_DEFAULT_MODEL; }
+}
+function saveGeminiSettings() {
+  const v = (document.getElementById('geminiKeyInput').value || '').trim();
+  try {
+    if (v) localStorage.setItem('tp_gemini_key', v);
+    else localStorage.removeItem('tp_gemini_key');
+  } catch (e) {}
+  setAIStatus('info', v ? 'Custom API key saved' : 'Using the built-in default key');
+  showSnackbar('AI settings saved');
+}
 function setAIStatus(kind, text) {
   const el = document.getElementById('aiStatusLine');
   if (!el) return;
-  const icon = kind === 'ai' ? '✨' : (kind === 'offline' ? '⚡' : (kind === 'bad' ? '❌' : '…'));
-  const cls = kind === 'ai' ? 'ai-ok' : (kind === 'offline' ? 'ai-warn' : (kind === 'bad' ? 'ai-bad' : ''));
-  el.innerHTML = `${icon} <span class="${cls}">${kind === 'ai' ? 'AI mode' : (kind === 'offline' ? 'Offline mode' : (kind === 'bad' ? 'AI unreachable' : 'Checking AI…'))}</span> — ${escapeHTML(text)}`;
+  const icon = kind === 'ai' ? '✨' : kind === 'bad' ? '⚠️' : 'ℹ️';
+  el.innerHTML = icon + ' ' + escapeHTML(text);
 }
 
-/* ---------- AI DIAGNOSTICS: "Test AI" button + auto probe ---------- */
-async function probeAIStatus() {
+const PASTE_PROMPT = `You extract exam questions from messy teacher/ChatGPT text and output ONLY a JSON array (no prose, no markdown fences, no comments).
+Each array element is one question:
+{
+  "text": "clean question text without numbering, never include answers",
+  "type": "mcq" | "subjective" | "subq" | "or",
+  "marks": 2,
+  "section": "Section A",
+  "options": ["...", "...", "...", "..."],
+  "subQuestions": [{"label": "a", "text": "...", "marks": 2}],
+  "orAlternative": "..."
+}
+Field rules:
+- "type": "mcq" for multiple-choice (fill "options", 2-4 choices). "subjective" for True/False, fill-ups, short and long answers. "subq" for questions with (a)/(b)/(c) parts (fill "subQuestions"; "marks" = sum of part marks). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
+- Use only the keys that apply: "options" for mcq, "subQuestions" for subq, "orAlternative" for or. Keep "text", "type", "marks", "section" always.
+- "section": from headers like "SECTION A" / "Part B"; default "Section A". Marks from section headers (e.g. "2 marks each") or per-question marks; default 1.
+Cleaning rules:
+- Remove numbering (Q1, 1., (2)), markdown **bold**, emojis, answer keys, explanations, tips, teacher notes.
+- Keep original language of the question.
+- Never include answers in text.`;
+
+async function geminiChat(prompt, systemPrompt) {
+  const key = geminiKey();            // '' unless this browser has its own key saved
+  const model = geminiModel();
+  const viaProxy = !key;              // no personal key -> site's server-side proxy holds the key
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      let url, reqBody;
+      if (viaProxy) {
+        url = GEMINI_PROXY_URL;
+        reqBody = { model: model, prompt: prompt, systemPrompt: systemPrompt || '' };
+      } else {
+        url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) +
+          ':generateContent?key=' + encodeURIComponent(key);
+        reqBody = {
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+        };
+        if (systemPrompt) reqBody.systemInstruction = { parts: [{ text: systemPrompt }] };
+      }
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqBody)
+      });
+      const data = await res.json().catch(() => ({}));
+      const emsg = (data.error && (data.error.message || data.error)) || '';
+      if (!res.ok || emsg || data.ok === false) {
+        let msg = emsg || ('HTTP ' + res.status);
+        if (viaProxy && res.status === 404) msg = 'Site AI proxy not found (deploy netlify/functions/gemini.js)';
+        const err = new Error(msg);
+        err.status = res.status;
+        if (res.status === 400 || res.status === 403 || res.status === 404) throw err; // fail fast
+        lastErr = err;
+        await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+        continue;
+      }
+      let text;
+      if (viaProxy) {
+        text = String(data.text || '').trim();
+      } else {
+        const parts = ((((data.candidates || [])[0] || {}).content || {}).parts) || [];
+        text = parts.filter(p => p && p.text && p.thought !== true).map(p => p.text).join('\n').trim();
+      }
+      if (!text) throw new Error('Empty response from Gemini');
+      return text;
+    } catch (e) {
+      if (e && e.status) throw e;                       // HTTP 4xx — do not retry
+      lastErr = e;                                      // network error — retry
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+    }
+  }
+  throw lastErr || new Error('Gemini request failed');
+}
+
+/* ---------- ROBUST AI-REPLY PARSER (survives prose around the JSON) ---------- */
+function parseAIQuestionArray(text) {
+  const coerce = (x) => {
+    if (Array.isArray(x)) return x.filter(o => o && typeof o === 'object' && (o.text || o.question));
+    if (x && Array.isArray(x.questions)) return coerce(x.questions);
+    return [];
+  };
+  if (!text) return [];
+  let t = String(text).replace(/```(?:json)?/gi, '').trim();
+  const i = t.indexOf('['), j = t.lastIndexOf(']');
+  const salv = (raw) => {
+    try { return coerce(JSON.parse(raw)); } catch (e) {}
+    try { return coerce(JSON.parse(raw.replace(/,\s*([\]}])/g, '$1'))); } catch (e) {}
+    try { return coerce(JSON.parse(raw.replace(/,\s*([\]}])/g, '$1').replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'"))); } catch (e) {}
+    return null;
+  };
+  if (i !== -1 && j > i) {
+    const got = salv(t.slice(i, j + 1));
+    if (got) return got;
+  }
+  const oi = t.indexOf('{'), oj = t.lastIndexOf('}');
+  if (oi !== -1 && oj > oi) {
+    const got = salv(t.slice(oi, oj + 1));
+    if (got) return got;
+  }
+  return [];
+}
+
+function ingestQuestions(arr, replaceIfEmpty = false) {
+  if (!Array.isArray(arr) || !arr.length) return 0;
+  if (replaceIfEmpty && !questions.length) questions = [];
+  let add = 0;
+  arr.forEach(o => {
+    const text = String(o.text || o.question || '').trim();
+    if (!text) return;
+    if (questions.some(q => q.text === text)) return; // append-unique
+    let type = String(o.type || '').toLowerCase().trim();
+    const opts = Array.isArray(o.options) ? o.options.map(s => String(s).trim()).filter(Boolean) : [];
+    const rawSubs = Array.isArray(o.subQuestions) ? o.subQuestions : (Array.isArray(o.subParts) ? o.subParts : []);
+    const orAlt = String(o.orAlternative || o.or || '').trim();
+    if (['mcq', 'objective', 'multiple choice', 'multiple-choice'].includes(type)) type = 'mcq';
+    else if (['subq', 'sub-part', 'subparts', 'multi-part', 'compound'].includes(type)) type = 'subq';
+    else if (['or', 'choice', 'either or'].includes(type)) type = 'or';
+    else if (['subjective', 'long', 'short', 'truefalse', 'true/false', 'fill', 'fillup', 'theory', 'descriptive'].includes(type)) type = 'subjective';
+    else if (opts.length >= 2) type = 'mcq';           // type missing/unrecognized -> auto-detect
+    else if (rawSubs.length >= 2) type = 'subq';
+    else if (orAlt) type = 'or';
+    else type = 'subjective';
+    const marksRaw = parseInt(o.marks, 10) || 0;
+    const section = String(o.section || 'Section A').trim() || 'Section A';
+    const subQuestions = rawSubs.map((s, i) => ({
+      label: String((s && s.label) || String.fromCharCode(97 + i)),
+      text: String((s && (s.text || s.question)) || '').trim(),
+      marks: Math.max(1, parseInt(s && s.marks, 10) || 1)
+    })).filter(s => s.text);
+    // for subq with no total marks, sum the part marks (matches offline parser)
+    const marks = Math.max(1, marksRaw || (type === 'subq' && subQuestions.length
+      ? subQuestions.reduce((s, x) => s + x.marks, 0) : 0) || 1);
+    questions.push({
+      id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      text, marks, type,
+      options: type === 'mcq' ? opts : [],
+      subQuestions: type === 'subq' ? (subQuestions.length ? subQuestions : [{ label: 'a', text: '', marks: 1 }]) : [],
+      orAlternative: type === 'or' ? (orAlt || null) : null,
+      image: '', section
+    });
+    add++;
+  });
+  return add;
+}
+
+async function processWithAI() {
+  const raw = (document.getElementById('pasteArea').value || '').trim();
+  if (!raw) { showSnackbar('Paste some text first'); return; }
+  setAIStatus('ai', (geminiKey() ? 'Gemini' : 'Site AI') + ' is reading your text…');
   const t0 = Date.now();
+  const capped = raw.length > 24000 ? raw.slice(0, 24000) : raw;
   try {
-    const r = await fetch('https://text.pollinations.ai/Reply%20with%20exactly%3A%20PONG');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    await r.text();
-    setAIStatus('ai', `connection OK (${Date.now() - t0}ms) — Process with AI will use the AI`);
+    const reply = await geminiChat(PASTE_PROMPT + '\n\nTEXT:\n' + capped,
+      'You are a precise exam-paper data extractor. You output strictly valid JSON arrays and nothing else.');
+    const parsed = parseAIQuestionArray(reply);
+    const n = ingestQuestions(parsed, true);
+    if (!n) throw new Error('Gemini returned no questions');
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    setAIStatus('ai', `${n} question${n === 1 ? '' : 's'} parsed in ${secs}s (via Gemini)`);
+    if (questions.length) {
+      document.getElementById('questionsListCard').style.display = 'block';
+      renderQuestionsList();
+      updateSummary();
+      refreshLivePreviews();
+      saveState();
+    }
+    showSnackbar(`✨ ${n} question${n === 1 ? '' : 's'} added (via Gemini)`);
   } catch (e) {
-    setAIStatus('bad', `cannot reach text.pollinations.ai (${e.message || 'network error'}) — app will use Offline mode`);
+    const msg = (e && e.message) || 'unknown error';
+    setAIStatus('bad', `AI error: ${msg} — using offline parser instead`);
+    showSnackbar('AI failed — falling back to the offline parser');
+    try { processOffline(); } catch (e2) {}
   }
 }
 
 async function testAIConnection() {
   const box = document.getElementById('aiTestResult');
-  if (box) { box.style.display = 'block'; box.innerHTML = '⏳ Testing AI connection…'; }
-  const line = (ok, label, info) =>
-    `<div>${ok ? '✅' : '❌'} <b>${label}</b> — ${escapeHTML(info)}</div>`;
-  let out = '';
-  let getOk = false, postOk = false;
-
-  // 1) simple GET (what the offline-proof fallback uses)
-  let t0 = Date.now();
-  try {
-    const r = await fetch('https://text.pollinations.ai/Reply%20with%20exactly%3A%20PONG');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const txt = await r.text();
-    getOk = true;
-    out += line(true, 'Basic endpoint (GET)', `OK in ${Date.now() - t0}ms — replied: "${txt.trim().slice(0, 40)}"`);
-  } catch (e) {
-    out += line(false, 'Basic endpoint (GET)', (e && e.message) || 'network error');
-  }
-
-  // 2) full chat API (what "Process with AI" uses)
-  t0 = Date.now();
-  try {
-    const r = await fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'openai', temperature: 0, messages: [{ role: 'user', content: 'Reply with exactly: PONG' }] })
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    const msg = data.choices?.[0]?.message?.content || data.content || data.text || '';
-    const reply = String(msg).trim().slice(0, 40);
-    postOk = true;
-    out += line(true, 'AI chat API (POST)', `OK in ${Date.now() - t0}ms — model: ${data.model || 'n/a'} — replied: "${reply}"`);
-  } catch (e) {
-    out += line(false, 'AI chat API (POST)', (e && e.message) || 'network error');
-  }
-
-  // 3) Local AI (WebLLM) status
-  if (!navigator.gpu) {
-    out += line(false, 'Local AI (WebLLM)', 'WebGPU not available in this browser — needs Chrome / Edge 113+. (Optional — cloud & offline still work)');
-  } else if (llmState === 'ready') {
-    out += line(true, 'Local AI (WebLLM)', `loaded: ${llmModelId} — unlimited, used before cloud`);
-  } else {
-    out += `<div>⏭️ <b>Local AI (WebLLM)</b> — not enabled (optional & unlimited). Use the "Local AI" box below to turn it on.</div>`;
-  }
-
-  // verdict
-  if (llmState === 'ready' && llmEngine) {
-    out += `<div class="ai-ok" style="margin-top:8px;">🎉 <b>LOCAL AI is active</b> — unlimited & private. Cloud AI and Offline remain as automatic fallbacks.</div>`;
-    setAIStatus('ai', 'Local WebLLM active — unlimited, works offline');
-  } else if (getOk && postOk) {
-    out += `<div class="ai-ok" style="margin-top:8px;">🎉 <b>AI is ONLINE</b> — "Process with AI" and the chatbot will use real AI.</div>`;
-    setAIStatus('ai', 'full test passed — AI is online');
-  } else if (getOk && !postOk) {
-    out += `<div class="ai-warn" style="margin-top:8px;">⚠️ <b>Partial</b> — short texts can use AI; long pastes will fall back to Offline mode.</div>`;
-    setAIStatus('offline', 'chat API failed — long pastes will use offline parser');
-  } else {
-    out += `<div class="ai-bad" style="margin-top:8px;">❌ <b>AI is OFFLINE for this browser</b> — the app will use Offline mode.<br>
-      Common causes: ad-blocker / privacy extension blocking pollinations.ai, school/office firewall, no internet, or the free service is rate-limited. Try another network or disable the ad-blocker for this site.</div>`;
-    setAIStatus('bad', 'AI endpoints unreachable — offline mode will be used');
-  }
-  if (box) box.innerHTML = out;
-}
-
-/* ---------- ROBUST AI-REPLY PARSER (survives prose around the JSON) ---------- */
-function parseAIQuestionArray(content) {
-  let txt = String(content || '');
-  txt = txt.replace(/```json/gi, '```').replace(/```/g, '').trim();
-
-  const accept = v => {
-    if (Array.isArray(v) && v.length && v.some(x => x && typeof x === 'object')) return v;
-    if (v && typeof v === 'object') {
-      const k = Object.keys(v).find(k => Array.isArray(v[k]) && v[k].length && v[k].some(x => x && typeof x === 'object'));
-      if (k) return v[k];
-    }
-    return null;
-  };
-  const tryParse = s => {
-    try { return accept(JSON.parse(s)); } catch (e) {
-      // repair trailing commas: [1,2,] -> [1,2]
-      try { return accept(JSON.parse(s.replace(/,\s*([\]\}])/g, '$1'))); } catch (e2) {
-        // repair python-style single quotes used as delimiters (not apostrophes in words)
-        try { return accept(JSON.parse(s.replace(/([\{\[,:]\s*)'/g, '$1"').replace(/'(\s*[\}\],:])/g, '"$1'))); } catch (e3) {}
-      }
-    }
-    return null;
-  };
-
-  // 1) whole text is (or contains) valid JSON
-  const direct = tryParse(txt);
-  if (direct) return direct;
-
-  // 2) balanced scan: find every complete [...] block and try to parse it
-  for (let start = 0; start < txt.length; start++) {
-    if (txt[start] !== '[') continue;
-    let depth = 0, inStr = false, esc = false;
-    for (let i = start; i < txt.length; i++) {
-      const ch = txt[i];
-      if (inStr) {
-        if (esc) esc = false;
-        else if (ch === '\\') esc = true;
-        else if (ch === '"') inStr = false;
-      } else {
-        if (ch === '"') inStr = true;
-        else if (ch === '[') depth++;
-        else if (ch === ']') {
-          depth--;
-          if (depth === 0) {
-            const got = tryParse(txt.slice(start, i + 1));
-            if (got) return got;
-            break; // this '[' isn't a JSON array — try the next '['
-          }
-        }
-      }
-    }
-  }
-  return null;
-}
-
-/* ==================== LOCAL AI (WebLLM — in-browser, unlimited, offline) ==================== */
-let llmEngine = null;
-let llmState = 'off';          // off | loading | ready
-let llmModelId = '';
-let lastAISource = 'cloud';    // 'local' | 'cloud' — for the status line
-
-async function loadWebLLMModule() {
-  // isolated in its own function so it can be stubbed in tests
-  return import('https://esm.run/@mlc-ai/web-llm@0.2.85');
-}
-
-function setLocalAIStatus(kind, text) {
-  const el = document.getElementById('localAIStatus');
-  if (!el) return;
-  const cls = kind === 'ai' ? 'ai-ok' : (kind === 'bad' ? 'ai-bad' : (kind === 'warn' ? 'ai-warn' : ''));
-  const icon = kind === 'ai' ? '✅' : (kind === 'bad' ? '❌' : (kind === 'warn' ? '⚠️' : '⏳'));
-  el.innerHTML = `${icon} <span class="${cls}">${escapeHTML(text)}</span>`;
-}
-
-function setLocalAIProgress(frac) {
-  const wrap = document.getElementById('localAIProgressWrap');
-  const bar = document.getElementById('localAIProgress');
-  if (!wrap || !bar) return;
-  if (frac == null) { wrap.classList.remove('active'); bar.style.width = '0%'; return; }
-  wrap.classList.add('active');
-  bar.style.width = Math.max(0, Math.min(100, Math.round(frac * 100))) + '%';
-}
-
-async function toggleLocalAI() {
-  if (llmState === 'ready') return disableLocalAI();
-  return enableLocalAI();
-}
-
-function gpuGuidanceText() {
-  const ua = navigator.userAgent || '';
-  const isFF = /Firefox\//.test(ua);
-  const isSafari = /Safari\//.test(ua) && !/Chrome\//.test(ua) && !/Edg\//.test(ua);
-  const chromeVer = parseInt((ua.match(/Chrome\/(\d+)/) || [])[1] || '0', 10);
-  const edgeVer = parseInt((ua.match(/Edg\/(\d+)/) || [])[1] || '0', 10);
-  if (isFF) return 'Firefox\'s WebGPU support is incomplete — please switch to Chrome or Edge.';
-  if (isSafari) return 'Safari needs macOS 15+ / iOS 18+ and the newest Safari version — Chrome or Edge is recommended.';
-  if ((chromeVer && chromeVer < 113) || (edgeVer && edgeVer < 113)) return 'Your browser is too old for WebGPU — update Chrome/Edge to version 113 or newer.';
-  return 'Checklist: (1) hardware acceleration is ON in browser settings, (2) GPU drivers are updated, (3) you are not on remote desktop / a virtual machine, (4) open chrome://gpu to see the WebGPU status.';
-}
-
-async function checkWebGPUSupport() {
-  if (!navigator.gpu) return { ok: false, reason: 'no-api' };
-  let adapter = null;
-  try { adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }); } catch (e) {}
-  if (!adapter) { try { adapter = await navigator.gpu.requestAdapter(); } catch (e) {} }
-  if (!adapter) return { ok: false, reason: 'no-adapter' };
-  try {
-    const device = await adapter.requestDevice();
-    if (device && typeof device.destroy === 'function') device.destroy();
-  } catch (e) { return { ok: false, reason: 'no-device' }; }
-  return { ok: true };
-}
-
-async function enableLocalAI() {
-  if (llmState === 'loading') return;
-  const btn = document.getElementById('localAIBtn');
-  // fast pre-flight: fail with real guidance BEFORE downloading anything
-  const support = await checkWebGPUSupport();
-  if (!support.ok) {
-    llmState = 'off';
-    setLocalAIStatus('bad',
-      (support.reason === 'no-api'
-        ? 'This browser has no WebGPU at all. '
-        : 'WebGPU is present but no usable GPU was found on this device. ')
-      + gpuGuidanceText()
-      + ' Don\'t worry — the app automatically uses free Cloud AI + Offline mode instead.');
-    return;
-  }
-  llmState = 'loading';
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  const sel = document.getElementById('localModelSelect');
-  const modelId = (sel && sel.value) || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
-  try {
-    setLocalAIStatus('info', 'Downloading model files (one-time — can take a few minutes)…');
-    setLocalAIProgress(0);
-    const mod = await loadWebLLMModule();
-    llmEngine = await mod.CreateMLCEngine(modelId, {
-      initProgressCallback: (p) => {
-        const frac = typeof p.progress === 'number' ? p.progress : 0;
-        setLocalAIProgress(frac);
-        setLocalAIStatus('info', `${Math.round(frac * 100)}% — ${String(p.text || 'loading model…').slice(0, 90)}`);
-      }
-    });
-    llmModelId = modelId;
-    llmState = 'ready';
-    setLocalAIProgress(null);
-    setLocalAIStatus('ai', `Local AI ready (${modelId.replace(/-MLC$/, '')}) — unlimited & offline-capable. It is used first; Cloud AI stays as fallback.`);
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">power_settings_new</span> Turn Off'; }
-    const testBtn = document.getElementById('localAITestBtn');
-    if (testBtn) testBtn.classList.remove('hidden');
-  } catch (e) {
-    console.warn(e);
-    llmEngine = null; llmState = 'off';
-    setLocalAIProgress(null);
-    const msg = String((e && e.message) || e);
-    if (/compatible GPU|WebGPU|GPU device|adapter/i.test(msg)) {
-      setLocalAIStatus('bad', 'Local AI can\'t run on this device. ' + gpuGuidanceText() + ' The app keeps using free Cloud AI + Offline automatically.');
-    } else {
-      setLocalAIStatus('bad', 'Could not start Local AI: ' + msg.slice(0, 160) + ' — Cloud AI / Offline still work.');
-    }
-    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI'; }
-  }
-}
-
-async function disableLocalAI() {
-  try { if (llmEngine && typeof llmEngine.unload === 'function') await llmEngine.unload(); } catch (e) {}
-  llmEngine = null; llmState = 'off'; llmModelId = '';
-  setLocalAIProgress(null);
-  setLocalAIStatus('info', 'Local AI turned off.');
-  const btn = document.getElementById('localAIBtn');
-  if (btn) btn.innerHTML = '<span class="material-symbols-rounded" style="font-size:15px;">download</span> Enable Local AI';
-  const testBtn = document.getElementById('localAITestBtn');
-  if (testBtn) testBtn.classList.add('hidden');
-}
-
-async function localChat(system, user, temperature, maxTokens) {
-  const messages = [];
-  if (system) messages.push({ role: 'system', content: system });
-  messages.push({ role: 'user', content: user });
-  const reply = await llmEngine.chat.completions.create({
-    messages,
-    temperature: temperature != null ? temperature : 0.2,
-    max_tokens: maxTokens || 2500
-  });
-  const content = reply && reply.choices && reply.choices[0] && reply.choices[0].message
-    ? reply.choices[0].message.content : '';
-  return typeof content === 'string' ? content : JSON.stringify(content || '');
-}
-
-async function testLocalAI() {
-  if (llmState !== 'ready') { setLocalAIStatus('warn', 'Local AI not loaded yet.'); return; }
-  setLocalAIStatus('info', 'Testing local model…');
-  try {
-    const t0 = Date.now();
-    const out = await localChat('', 'Reply with exactly: PONG', 0, 32);
-    setLocalAIStatus('ai', `Local model OK (${Date.now() - t0}ms) — replied "${String(out).trim().slice(0, 24)}"`);
-  } catch (e) {
-    setLocalAIStatus('bad', 'Local test failed: ' + ((e && e.message) || e));
-  }
-}
-
-/* One entry point for every AI call: LOCAL first, then Cloud, then (caller) Offline */
-async function smartAI(payload, shortPrompt) {
-  if (llmState === 'ready' && llmEngine) {
-    try {
-      const msgs = payload.messages || [];
-      const sys = msgs.filter(m => m.role === 'system').map(m => m.content).join('\n');
-      let usr = msgs.filter(m => m.role === 'user').map(m => m.content).join('\n');
-      if (usr.length > 8000) usr = usr.slice(0, 8000); // local models have ~4K token context
-      lastAISource = 'local';
-      return await localChat(sys, usr, payload.temperature, 2500);
-    } catch (e) {
-      console.warn('Local AI failed, falling back to Cloud AI', e);
-    }
-  }
-  lastAISource = 'cloud';
-  return aiRequest(payload, shortPrompt);
-}
-
-async function processWithAI() {
-  const raw = document.getElementById('pasteArea').value.trim();
-  if (!raw) { showSnackbar('Paste text first'); return; }
-
-  showAI('AI is reading your paper…', 'Cleaning answers, markdown & structure…');
+  if (!box) return;
+  box.style.display = 'block';
+  const viaProxy = !geminiKey();
+  const label = viaProxy ? 'Site AI (Gemini via server proxy)' : ('Gemini (' + escapeHTML(geminiModel()) + ')');
+  box.innerHTML = '⏳ Testing ' + (viaProxy ? 'site AI…' : 'Gemini…');
   const t0 = Date.now();
   try {
-    const payload = {
-      model: 'openai',
-      messages: [
-        { role: 'system', content: PASTE_PROMPT },
-        { role: 'user', content: raw.slice(0, 120000) }
-      ],
-      temperature: 0.1
-    };
-    const shortPrompt = raw.length < 5200 ? (PASTE_PROMPT + '\n\nTEXT:\n' + raw) : '';
-
-    let content = await smartAI(payload, shortPrompt);
-    let arr = parseAIQuestionArray(content);
-    if (!arr) {
-      // one stricter retry — some models answer with prose around the JSON
-      const stricter = await smartAI({
-        model: 'openai',
-        temperature: 0,
-        messages: [
-          { role: 'system', content: PASTE_PROMPT },
-          { role: 'user', content: raw.slice(0, 120000) + '\n\nIMPORTANT: Reply with ONLY the raw JSON array itself. No words before or after it, no markdown fences, no explanations.' }
-        ]
-      }, '');
-      arr = parseAIQuestionArray(stricter);
-    }
-    if (!arr) throw new Error('AI reply JSON was invalid');
-    if (!Array.isArray(arr) || !arr.length) throw new Error('AI reply was an empty list');
-
-    const parsed = ingestQuestions(arr, true);
-    if (!parsed) throw new Error('AI reply had no usable questions (unexpected format)');
-    hideAI();
-    const secs = ((Date.now() - t0) / 1000).toFixed(1);
-    const src = lastAISource === 'local' ? 'Local AI' : 'Cloud AI';
-    setAIStatus('ai', `${parsed} question${parsed === 1 ? '' : 's'} parsed in ${secs}s (via ${src})`);
-    showSnackbar(`✨ ${src} added ${parsed} question${parsed === 1 ? '' : 's'} (${secs}s)`);
+    const out = await geminiChat('Reply with exactly: OK', null);
+    const ms = Date.now() - t0;
+    box.innerHTML =
+      `<div>✅ <b>${label}</b> — ${ms} ms · replied "${escapeHTML(String(out).slice(0, 30))}"</div>` +
+      `<div>📋 <b>Offline parser</b> — built in, always works (automatic fallback)</div>` +
+      `<div class="ai-ok" style="margin-top:8px;">🎉 <b>AI is ready</b> — "Process with AI" will work. Teachers need zero setup.</div>`;
+    setAIStatus('ai', 'Gemini connection OK');
   } catch (e) {
-    console.warn(e);
-    hideAI();
-    // visible reason + guaranteed offline fallback so nothing is ever "silently the same"
-    processOffline();
-    const reason = (e && e.message) ? e.message : 'network error';
-    setAIStatus('offline', `AI error: ${reason} — offline parser used instead`);
-    showSnackbar(`AI failed (${reason}) — Offline parser used`);
+    const msg = (e && e.message) || 'failed';
+    const keyProblem = /api[ _-]?key|403|400|PERMISSION|denied/i.test(msg);
+    box.innerHTML =
+      `<div>❌ <b>${label}</b> — ${escapeHTML(msg)}</div>` +
+      `<div>📋 <b>Offline parser</b> — built in, always works (automatic fallback)</div>` +
+      (viaProxy
+        ? `<div class="ai-bad" style="margin-top:8px;">Site AI proxy problem — on Netlify set <b>GEMINI_API_KEY</b> (Site configuration → Environment variables) and redeploy; or paste your own free key in AI Settings below.</div>`
+        : (keyProblem
+          ? `<div class="ai-bad" style="margin-top:8px;">Check / replace the API key in AI Settings below.</div>`
+          : `<div class="ai-warn" style="margin-top:8px;">Connection problem — the offline parser will be used automatically.</div>`));
+    setAIStatus('bad', 'Gemini unreachable: ' + msg);
   }
-}
-
-function ingestQuestions(arr, replaceIfEmpty = false) {
-  const mapped = (arr || []).filter(q => q && typeof q === 'object').map(q => {
-    // tolerant keys — live AI models sometimes answer with "question"/"q" instead of "text"
-    const text = String(q.text ?? q.question ?? q.q ?? '').trim();
-    const section = String(q.section || 'Section A').trim();
-    if (section && !sections.includes(section)) sections.push(section);
-    const type = ['subjective','mcq','tf','fill','subq','or'].includes(q.type) ? q.type : 'subjective';
-    return {
-      id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
-      text,
-      marks: parseInt(q.marks,10) || 1,
-      type,
-      options: Array.isArray(q.options) ? q.options.map(String) : [],
-      subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions.map(sq => ({
-        label: String(sq.label||'a'), text: String(sq.text ?? sq.question ?? '').trim(), marks: parseInt(sq.marks,10)||1
-      })) : [],
-      orAlternative: q.orAlternative ? String(q.orAlternative) : null,
-      image: '',
-      section
-    };
-  }).filter(q => q.text.length > 3);
-  if (!mapped.length) { showSnackbar('No valid questions'); return 0; }
-  if (replaceIfEmpty && questions.length === 0) questions = mapped;
-  else {
-    const exist = new Set(questions.map(q => q.text.toLowerCase()));
-    mapped.forEach(q => { if (!exist.has(q.text.toLowerCase())) questions.push(q); });
-  }
-  document.getElementById('questionsListCard').style.display = 'block';
-  saveState(); updateSectionDropdowns(); renderQuestionsList(); refreshLivePreviews();
-  return mapped.length;
 }
 
 /* ---------- QUESTION LIST ---------- */
@@ -1910,190 +1626,6 @@ function updateSummary(){
   el.innerHTML=h;
 }
 
-/* ---------- UNIVERSAL AI CHATBOT ---------- */
-function toggleChatbot(){
-  document.getElementById('chatbotPanel').classList.toggle('active');
-}
-function appendMsg(text, user){
-  const body=document.getElementById('chatBody');
-  const d=document.createElement('div');
-  d.className='chat-msg '+(user?'user':'bot');
-  d.textContent=text;
-  body.appendChild(d);
-  body.scrollTop=body.scrollHeight;
-  return d;
-}
-
-const CBSE_HISTORY = `OFFICIAL CBSE Class 12 History (NCERT):
-Part I: 1 Bricks Beads and Bones (Harappan) 2 Kings Farmers and Towns 3 Kinship Caste and Class 4 Thinkers Beliefs and Buildings
-Part II: 5 Through the Eyes of Travellers 6 Bhakti-Sufi Traditions 7 Vijayanagara 8 Peasants Zamindars and the State
-Part III: 9 Colonialism and the Countryside 10 Rebels and the Raj 11 Mahatma Gandhi and Nationalist Movement 12 Framing the Constitution`;
-
-const CHAT_SYSTEM = `You are TestPaper Pro Universal Co-Pilot — a full general AI (like ChatGPT) AND exam paper controller.
-You can answer ANY general knowledge question (capitals, science, math, etc.).
-For CBSE Class 12 History chapters use this exact list:
-${CBSE_HISTORY}
-
-You can also CONTROL the website with ACTION TAGS at the end of your reply when needed:
-[CLEAR_ALL]
-[DELETE_QUESTION:3]           // 1-based index
-[SET_INSTRUCTIONS:line1\\nline2]
-[SET_DETAIL:schoolName=Delhi Public School]
-[SET_DETAIL:examTitle=Half Yearly]
-[SET_DETAIL:subject=History]
-[SET_DETAIL:classGrade=12]
-[SET_DETAIL:teacherName=Rahul]
-[SET_DETAIL:duration=3 Hours]
-[SET_DETAIL:totalMarks=80]
-[TOGGLE_SETTING:answerLines=false]
-[TOGGLE_SETTING:studentBox=true]
-[ADD_QUESTIONS:[{"text":"...","marks":1,"type":"mcq","options":["A","B","C","D"],"section":"Section A"}]]
-[REPLACE_QUESTION:2:{"text":"...","marks":5,"type":"subjective","section":"Section C"}]
-
-Rules:
-- Be helpful and concise.
-- If user asks to change the paper, include the correct action tag.
-- For ADD_QUESTIONS use strict JSON array.
-- Do not use markdown code fences around action tags.
-- General questions: just answer, no tags needed.`;
-
-async function sendChatMessage(){
-  const input=document.getElementById('chatInput');
-  const msg=input.value.trim(); if(!msg) return;
-  input.value='';
-  appendMsg(msg,true);
-  const thinking=appendMsg('…',false);
-
-  const stateCtx = {
-    schoolName:val('schoolName'), examTitle:val('examTitle'), subject:val('subject'),
-    classGrade:val('classGrade'), totalMarks:val('totalMarks'),
-    instructions:val('instructions'),
-    questionCount:questions.length,
-    questions:questions.slice(0,40).map((q,i)=>({n:i+1,text:q.text.slice(0,120),marks:q.marks,type:q.type,section:q.section}))
-  };
-
-  try{
-    const sysMsg = CHAT_SYSTEM + '\n\nCURRENT_PAPER_STATE:\n'+JSON.stringify(stateCtx);
-    // short version for the GET fallback (URL length limited)
-    const shortPrompt = ('You are TestPaper Pro Co-Pilot. Be concise. Use the same ACTION TAGS as instructed.\n' + sysMsg.slice(0, 2100) + '\n\nUSER: ' + msg).slice(0, 6800);
-    const replyRaw = await smartAI({
-      model:'openai',
-      temperature:0.5,
-      messages:[
-        {role:'system', content: sysMsg},
-        {role:'user', content: msg}
-      ]
-    }, shortPrompt);
-    let reply = replyRaw;
-    if(typeof reply!=='string') reply=JSON.stringify(reply);
-
-    // Execute action tags
-    reply = executeActionTags(reply);
-
-    thinking.textContent = reply
-      .replace(/\[ADD_QUESTIONS\s*:\s*\[[\s\S]*?\]\s*\]/gi,'')
-      .replace(/\[REPLACE_QUESTION\s*:\s*\d+\s*:\s*\{[\s\S]*?\}\s*\]/gi,'')
-      .replace(/\[[A-Z_]+\s*:[\s\S]*?\]/g,'')
-      .replace(/\[CLEAR_ALL\]/gi,'').trim() || 'Done.';
-    document.getElementById('chatBody').scrollTop = document.getElementById('chatBody').scrollHeight;
-  }catch(e){
-    console.warn(e);
-    thinking.textContent = 'Could not reach AI (' + ((e && e.message) || 'network error') + '). Check internet / ad-blocker, or press "Test AI" in the Questions tab.';
-  }
-}
-
-function executeActionTags(reply){
-  let r = reply;
-
-  if (/\[CLEAR_ALL\]/i.test(r)) {
-    questions = [];
-    renderQuestionsList(); saveState(); refreshLivePreviews();
-    r += '\n\n✅ Cleared all questions.';
-  }
-
-  r = r.replace(/\[DELETE_QUESTION\s*:\s*(\d+)\]/gi, (_, n) => {
-    const idx = parseInt(n,10)-1;
-    if (idx>=0 && idx<questions.length) {
-      questions.splice(idx,1);
-      renderQuestionsList(); saveState(); refreshLivePreviews();
-      return `\n✅ Deleted question ${n}.`;
-    }
-    return `\n⚠️ Question ${n} not found.`;
-  });
-
-  r = r.replace(/\[SET_INSTRUCTIONS\s*:\s*([\s\S]*?)\]/gi, (_, text) => {
-    const clean = text.replace(/\\n/g,'\n').trim();
-    document.getElementById('instructions').value = clean;
-    saveState(); refreshLivePreviews();
-    return '\n✅ Instructions updated on the paper.';
-  });
-
-  r = r.replace(/\[SET_DETAIL\s*:\s*([a-zA-Z]+)\s*=\s*([^\]]+)\]/gi, (_, key, value) => {
-    const map = {
-      schoolname:'schoolName', examtitle:'examTitle', subject:'subject', classgrade:'classGrade',
-      teachername:'teacherName', duration:'duration', totalmarks:'totalMarks', examdate:'examDate'
-    };
-    const id = map[key.toLowerCase()] || key;
-    const el = document.getElementById(id);
-    if (el) {
-      el.value = value.trim();
-      saveState(); refreshLivePreviews();
-      return `\n✅ Set ${id} = ${value.trim()}`;
-    }
-    return `\n⚠️ Unknown field ${key}`;
-  });
-
-  r = r.replace(/\[TOGGLE_SETTING\s*:\s*(answerLines|studentBox)\s*=\s*(true|false)\]/gi, (_, key, val) => {
-    const on = String(val).toLowerCase()==='true';
-    if (key.toLowerCase()==='answerlines') {
-      appSettings.showAnswerLines = on;
-      const a=document.getElementById('toggleAnswerLines'); const b=document.getElementById('quickToggleLines');
-      if(a)a.checked=on; if(b)b.checked=on;
-    } else {
-      appSettings.includeStudentBox = on;
-      const a=document.getElementById('toggleStudentBox'); if(a)a.checked=on;
-    }
-    saveState(); refreshLivePreviews();
-    return `\n✅ ${key} = ${on}`;
-  });
-
-  r = r.replace(/\[ADD_QUESTIONS\s*:\s*(\[[\s\S]*?\])\s*\]/gi, (_, json) => {
-    try {
-      const arr = JSON.parse(json);
-      const before = questions.length;
-      ingestQuestions(arr, false);
-      return `\n✅ Added ${questions.length-before} question(s) to your paper.`;
-    } catch(e) {
-      return '\n⚠️ Could not parse ADD_QUESTIONS JSON.';
-    }
-  });
-
-  r = r.replace(/\[REPLACE_QUESTION\s*:\s*(\d+)\s*:\s*(\{[\s\S]*?\})\s*\]/gi, (_, n, json) => {
-    try {
-      const idx = parseInt(n,10)-1;
-      const obj = JSON.parse(json);
-      if (idx<0 || idx>=questions.length) return `\n⚠️ Question ${n} not found.`;
-      const old = questions[idx];
-      questions[idx] = {
-        ...old,
-        text: obj.text != null ? String(obj.text) : old.text,
-        marks: obj.marks != null ? parseInt(obj.marks,10)||old.marks : old.marks,
-        type: obj.type || old.type,
-        options: Array.isArray(obj.options) ? obj.options : old.options,
-        subQuestions: Array.isArray(obj.subQuestions) ? obj.subQuestions : old.subQuestions,
-        orAlternative: obj.orAlternative != null ? obj.orAlternative : old.orAlternative,
-        section: obj.section || old.section
-      };
-      renderQuestionsList(); saveState(); refreshLivePreviews();
-      return `\n✅ Replaced question ${n}.`;
-    } catch(e) {
-      return '\n⚠️ REPLACE_QUESTION failed.';
-    }
-  });
-
-  return r;
-}
-
 /* ---------- HD PDF (NO BLANK PAGE) ---------- */
 async function downloadPDF(){
   if (!questions.length) { showSnackbar('Add questions first'); return; }
@@ -2160,5 +1692,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a47eda5eac8e9cd7',t:'MTc5MTU2NDI5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4839daa4b0b91e8',t:'MTc5MTYxNDI0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
