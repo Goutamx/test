@@ -163,6 +163,9 @@
     .pdf-page-wrapper { padding: 0 !important; }
     .pv-question, .pv-student-box, .pv-instructions, .pv-section-title { page-break-inside: avoid; break-inside: avoid; }
     .pv-section-title { page-break-after: avoid; break-after: avoid; }
+    html, body { height: auto !important; overflow: visible !important; }
+    .preview-container, .preview-body, .pdf-page-wrapper { margin: 0 !important; padding: 0 !important; border: none !important; }
+    #finalPreview > :last-child, #finalPreview .pv-question:last-child { margin-bottom: 0 !important; }
     @page { size: A4 portrait; margin: 15mm 18mm 15mm 22mm; }
   }
 
@@ -213,7 +216,7 @@
       <div class="form-grid">
         <div class="form-group full">
           <label>School Name *</label>
-          <input type="text" id="schoolName" placeholder="e.g. Shiva Children's Academy">
+          <input type="text" id="schoolName">
         </div>
         <div class="form-group">
           <label>School Logo (High Res)</label>
@@ -228,19 +231,19 @@
         </div>
         <div class="form-group">
           <label>Exam Title *</label>
-          <input type="text" id="examTitle" placeholder="e.g. Daily Revision">
+          <input type="text" id="examTitle">
         </div>
         <div class="form-group">
           <label>Subject</label>
-          <input type="text" id="subject" placeholder="e.g. History">
+          <input type="text" id="subject">
         </div>
         <div class="form-group">
           <label>Class / Grade</label>
-          <input type="text" id="classGrade" placeholder="e.g. 12">
+          <input type="text" id="classGrade">
         </div>
         <div class="form-group">
           <label>Teacher Name</label>
-          <input type="text" id="teacherName" placeholder="e.g. Rahul Swami">
+          <input type="text" id="teacherName">
         </div>
         <div class="form-group">
           <label>Date of Exam</label>
@@ -248,11 +251,11 @@
         </div>
         <div class="form-group">
           <label>Duration</label>
-          <input type="text" id="duration" placeholder="e.g. 1 Hour">
+          <input type="text" id="duration">
         </div>
         <div class="form-group">
           <label>Maximum Marks *</label>
-          <input type="number" id="totalMarks" placeholder="e.g. 50" min="1">
+          <input type="number" id="totalMarks" min="1">
         </div>
       </div>
       <div class="btn-row">
@@ -290,6 +293,14 @@
         <textarea id="instructions" rows="7" placeholder="All questions are compulsory.&#10;Draw neat diagrams."></textarea>
       </div>
 
+      <div class="form-group full" style="margin-top:18px;">
+        <label style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-section);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;">
+          <input type="checkbox" id="toggleAutoInstr" checked onchange="setAutoInstr(this.checked)" style="width:18px;height:18px;accent-color:var(--accent);">
+          <span style="font-weight:600;font-size:0.9rem;">Auto-fit instructions to the paper (sections, question numbers, marks, word limits)</span>
+        </label>
+        <p id="autoInstrNote" style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;">Standard instructions are generated from your questions at export time, so they always match the final paper. Uncheck to write your own in the box above.</p>
+      </div>
+
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border-color);">
         <h3 style="font-size:0.95rem;font-weight:700;margin-bottom:12px;">Paper Layout Options</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;">
@@ -298,9 +309,18 @@
             <span style="font-weight:600;font-size:0.9rem;">Include Answer Writing Lines</span>
           </label>
           <label style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-section);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;">
-            <input type="checkbox" id="toggleStudentBox" checked onchange="appSettings.includeStudentBox = this.checked; saveSavedState(); refreshLivePreviews();" style="width:18px;height:18px;accent-color:var(--accent);">
+            <input type="checkbox" id="toggleStudentBox" checked onchange="appSettings.includeStudentBox = this.checked; syncLayoutUI(); saveSavedState(); refreshLivePreviews();" style="width:18px;height:18px;accent-color:var(--accent);">
             <span style="font-weight:600;font-size:0.9rem;">Include Candidate Info Box</span>
           </label>
+          <div id="candidateFields" style="grid-column:1/-1;display:flex;gap:8px 14px;flex-wrap:wrap;align-items:center;padding:10px 14px;background:var(--bg-input);border:1px dashed var(--border-color);border-radius:12px;">
+            <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">Candidate box fields:</span>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfName" checked onchange="setStudentField('name',this.checked)" style="accent-color:var(--accent);">Name</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfRoll" checked onchange="setStudentField('roll',this.checked)" style="accent-color:var(--accent);">Roll No.</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfSection" checked onchange="setStudentField('section',this.checked)" style="accent-color:var(--accent);">Section</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfDate" checked onchange="setStudentField('date',this.checked)" style="accent-color:var(--accent);">Date</label>
+            <label style="display:flex;gap:6px;align-items:center;font-size:0.82rem;font-weight:600;cursor:pointer;"><input type="checkbox" id="cfInv" checked onchange="setStudentField('invigilator',this.checked)" style="accent-color:var(--accent);">Invigilator's Sign</label>
+            <span style="font-size:0.72rem;color:var(--text-muted);width:100%;">All fields print as blank lines — the date stays empty even if the paper is made before the exam date is known.</span>
+          </div>
         </div>
       </div>
 
@@ -312,7 +332,7 @@
   </div>
     <!-- ==================== STEP 3: QUESTIONS ==================== -->
   <div class="step-page" id="page3">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;" id="step3Split">
+    <div style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;" id="step3Split">
       <div>
         <div class="card">
           <div class="card-header">
@@ -368,34 +388,9 @@ The parser will automatically:
               <button class="btn btn-secondary" onclick="processOffline()">
                 <span class="material-symbols-rounded">bolt</span> Parse Questions
               </button>
-              <button class="btn btn-secondary" onclick="testAIConnection()">
-                <span class="material-symbols-rounded">network_check</span> Test AI
-              </button>
               <button class="btn btn-secondary" onclick="document.getElementById('pasteArea').value=''">Clear</button>
             </div>
             <div class="ai-status" id="aiStatusLine"></div>
-            <div class="ai-test-box" id="aiTestResult" style="display:none;"></div>
-            <details class="ai-test-box" style="margin-top:12px;">
-              <summary style="cursor:pointer;font-weight:700;">⚙️ AI Settings (Google Gemini — free)</summary>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
-                <select id="geminiModelSelect" class="local-model-select" onchange="localStorage.setItem('tp_gemini_model', this.value); setAIStatus('info','Model set to '+this.value);">
-                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — fastest (default)</option>
-                  <option value="gemini-3.5-flash">Gemini 3.5 Flash — better quality</option>
-                  <option value="gemini-flash-lite-latest">Flash-Lite Latest — auto-updating</option>
-                </select>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;">
-                <input id="geminiKeyInput" type="password" placeholder="Your own API key (optional)" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border-color);border-radius:8px;background:var(--bg-input);color:var(--text-main);font-family:inherit;font-size:0.8rem;">
-                <button class="btn btn-sm btn-primary" onclick="saveGeminiSettings()">Save</button>
-                <button class="btn btn-sm btn-secondary" onclick="testAIConnection()">Test</button>
-              </div>
-              <div style="font-size:0.74rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">
-                <b>Zero setup:</b> AI runs through this site's own server proxy, so no key is needed and none is stored
-                in the page. Optionally paste <i>your own</i> free key (from <b>aistudio.google.com</b>, 2 minutes, no card)
-                to use your quota instead — it stays in this browser only and is sent only to Google. If AI is ever
-                unavailable or a free daily quota runs out, the app automatically falls back to the offline parser.
-              </div>
-            </details>
           </div>
 
           <!-- MANUAL TAB -->
@@ -494,13 +489,6 @@ The parser will automatically:
         </div>
       </div>
 
-      <!-- LIVE PREVIEW -->
-      <div class="preview-container" id="previewPanel">
-        <div style="background:var(--accent);color:#FFF;padding:11px 20px;font-size:0.82rem;font-weight:700;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;">
-          <span class="material-symbols-rounded" style="font-size:17px;">visibility</span> Live Preview
-        </div>
-        <div class="preview-body"><div class="pdf-page-wrapper" id="livePreview"></div></div>
-      </div>
     </div>
   </div>
 
@@ -511,12 +499,11 @@ The parser will automatically:
         <div class="card-header-icon"><span class="material-symbols-rounded">verified</span></div>
         <div class="card-header-text">
           <h2>Preview & Export</h2>
-          <p class="subtitle">High-resolution PDF. Zoom stays perfect. Empty fields are hidden.</p>
         </div>
       </div>
       <div class="no-print" style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;">
         <button class="btn btn-primary" onclick="downloadPDF()">
-          <span class="material-symbols-rounded">picture_as_pdf</span> Download HD PDF
+          <span class="material-symbols-rounded">picture_as_pdf</span> Download PDF
         </button>
         <button class="btn btn-secondary" onclick="printPaper()">
           <span class="material-symbols-rounded">print</span> Print
@@ -550,7 +537,7 @@ The parser will automatically:
       <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">1</div><div><b>Details:</b> Empty fields stay hidden on PDF.</div></div>
       <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">2</div><div><b>Instructions:</b> Type them or load a ready-made template.</div></div>
       <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">3</div><div><b>Questions:</b> Paste anything — the parser cleans it automatically.</div></div>
-      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">4</div><div><b>Export:</b> HD PDF that stays sharp when zoomed.</div></div>
+      <div style="display:flex;gap:12px;"><div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">4</div><div><b>Export:</b> the PDF matches the preview, page for page.</div></div>
     </div>
     <p style="margin-top:14px;font-size:0.78rem;color:var(--text-muted);background:var(--bg-section);padding:8px 12px;border-radius:8px;display:flex;gap:6px;align-items:center;">
       <span class="material-symbols-rounded" style="font-size:16px;color:var(--accent);">tips_and_updates</span>
@@ -605,7 +592,8 @@ let manualType = 'subjective';
 let currentStep = 1;
 let logoBase64 = '';
 let currentManualImage = '';
-let appSettings = { showAnswerLines: false, includeStudentBox: true };
+let appSettings = { showAnswerLines: false, includeStudentBox: true, autoInstructions: true,
+  studentFields: { name: true, roll: true, section: true, date: true, invigilator: true } };
 
 /* ==================== INIT ==================== */
 window.addEventListener('DOMContentLoaded', () => {
@@ -621,15 +609,13 @@ window.addEventListener('DOMContentLoaded', () => {
   refreshLivePreviews();
   // default one sub-part row
   addSubPartRow();
+  try { syncLayoutUI(); } catch (e) {}
   // AI settings init
   try {
     const sel = document.getElementById('geminiModelSelect');
     if (sel) sel.value = geminiModel();
     const kIn = document.getElementById('geminiKeyInput');
     if (kIn) kIn.value = geminiKey();
-    setAIStatus(geminiKey() ? 'ai' : 'info', geminiKey()
-      ? 'Gemini AI ready — "Process with AI" uses it; offline parser is the fallback'
-      : 'Site AI proxy in use (zero setup) — the offline parser is the automatic fallback');
   } catch (e) {}
 });
 
@@ -749,7 +735,7 @@ function handleLogo(e) {
       prev.src = logoBase64; prev.classList.remove('hidden');
       document.getElementById('logoPlaceholder').style.display = 'none';
       saveState(); refreshLivePreviews();
-      showSnackbar('HD Logo uploaded!');
+      showSnackbar('Logo uploaded!');
     };
     img.src = ev.target.result;
   };
@@ -758,6 +744,7 @@ function handleLogo(e) {
 
 /* ==================== NAVIGATION ==================== */
 function goStep(n) {
+  if (n === 4 && !questions.length) { showSnackbar('Add questions first'); return; }
   if (n === 2) {
     if (!val('schoolName').trim() || !val('examTitle').trim()) {
       showSnackbar('School Name & Exam Title required!');
@@ -786,14 +773,95 @@ function goStep(n) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+const STANDARD_INSTR_FALLBACK = [
+  "All questions are compulsory.",
+  "Marks for each question are indicated against it.",
+  "Answers shall be written within the prescribed word limit.",
+  "A separate question is provided for Visually Impaired Candidates where applicable.",
+  "There is no overall choice; internal choice is provided in a few questions."
+];
+
+/* Builds CBSE-style standard instructions that ADAPT to the actual paper:
+   total count, section letters, question-number ranges, type names, marks,
+   word limits, VI-note (only if the paper has images/map sections), choice line. */
+function autoInstructions() {
+  if (!questions.length) return [];
+  const lines = [];
+  lines.push('This question paper contains ' + questions.length + ' questions. All questions are compulsory.');
+  const order = [];
+  questions.forEach(q => { const sec = q.section || 'Section A'; if (!order.includes(sec)) order.push(sec); });
+  const letters = order.map(sec => (String(sec).replace(/^section\s*/i, '').trim() || 'A'));
+  const listTxt = letters.length > 1 ? letters.slice(0, -1).join(', ') + ' and ' + letters[letters.length - 1] : letters[0];
+  lines.push('Question paper is divided into ' + order.length + ' Section' + (order.length > 1 ? 's' : '') + ' \u2013 Section ' + listTxt + '.');
+  let num = 1;
+  order.forEach((sec, si) => {
+    const list = questions.filter(q => (q.section || 'Section A') === sec);
+    const a = num, b = num + list.length - 1;
+    const marksSet = Array.from(new Set(list.map(q => parseInt(q.marks, 10) || 1)));
+    const m = marksSet[0];
+    const mcq = list.filter(q => q.type === 'mcq').length;
+    const label = mcq >= list.length / 2 ? 'Multiple Choice (MCQ)'
+      : (m >= 5 ? 'Long Answer (LA)' : (m >= 3 ? 'Short Answer (SA)' : 'Very Short Answer (VSA)'));
+    let line = 'Section ' + letters[si] + ' - ' + (a === b ? 'Question No. ' + a + ' is' : 'Question Nos. ' + a + ' to ' + b + ' are') +
+      ' ' + label + ' type question' + (a === b ? '' : 's') + '.';
+    if (marksSet.length === 1) line += ' Each question carries ' + m + ' mark' + (m > 1 ? 's' : '') + '.';
+    else line += ' Marks for each question are indicated against it.';
+    if (label !== 'Multiple Choice (MCQ)' && marksSet.length === 1) {
+      if (m === 2) line += ' Answer to these questions shall be written in 30 to 50 words.';
+      else if (m === 3 || m === 4) line += ' Answer to these questions shall be written in 80 to 100 words.';
+      else if (m >= 5) line += ' Answer to these questions shall be written in 120 to 150 words.';
+    }
+    lines.push(line);
+    num += list.length;
+  });
+  if (questions.some(q => q.image || /map/i.test(q.section || ''))) {
+    lines.push('In addition to this, NOTE that a separate question has been provided for Visually Impaired Candidates in lieu of questions having visual inputs, map etc. Such questions are to be attempted by Visually Impaired Candidates only.');
+  }
+  lines.push(questions.some(q => q.type === 'or')
+    ? 'There is no overall choice given in the question paper. However, an internal choice has been provided in a few questions in all sections other than Section A.'
+    : 'There is no overall choice given in the question paper.');
+  return lines;
+}
+
+function setAutoInstr(v) {
+  appSettings.autoInstructions = !!v;
+  const t = document.getElementById('toggleAutoInstr');
+  if (t) t.checked = !!v;
+  const ta = document.getElementById('instructions');
+  if (ta) ta.disabled = !!v;
+  const note = document.getElementById('autoInstrNote');
+  if (note) note.textContent = v
+    ? 'Standard instructions are generated from your questions at export time, so they always match the final paper. Uncheck to write your own in the box above.'
+    : 'Manual mode — whatever is in the box above prints on the paper.';
+  saveSavedState(); refreshLivePreviews();
+}
+
+function setStudentField(k, v) {
+  if (!appSettings.studentFields) appSettings.studentFields = {};
+  appSettings.studentFields[k] = !!v;
+  saveSavedState(); refreshLivePreviews();
+}
+
+function syncLayoutUI() {
+  const t = document.getElementById('toggleAutoInstr');
+  if (t) t.checked = !!appSettings.autoInstructions;
+  const ta = document.getElementById('instructions');
+  if (ta) ta.disabled = !!appSettings.autoInstructions;
+  const sf = appSettings.studentFields || {};
+  const map = { cfName: 'name', cfRoll: 'roll', cfSection: 'section', cfDate: 'date', cfInv: 'invigilator' };
+  Object.entries(map).forEach(([id, k]) => { const el = document.getElementById(id); if (el) el.checked = sf[k] !== false; });
+  const panel = document.getElementById('candidateFields');
+  if (panel) panel.style.display = appSettings.includeStudentBox ? 'flex' : 'none';
+  const ts = document.getElementById('toggleStudentBox');
+  if (ts) ts.checked = !!appSettings.includeStudentBox;
+  const tl = document.getElementById('toggleAnswerLines');
+  if (tl) tl.checked = !!appSettings.showAnswerLines;
+}
+
 function loadStandardInstructions() {
-  document.getElementById('instructions').value = [
-    "All questions are compulsory unless internal choice is given.",
-    "Marks for each question are indicated against it.",
-    "Draw neat diagrams wherever necessary.",
-    "Write answers neatly and legibly.",
-    "Use of calculators is not allowed."
-  ].join('\n');
+  const gen = autoInstructions();
+  document.getElementById('instructions').value = (gen.length ? gen : STANDARD_INSTR_FALLBACK).join('\n');
+  setAutoInstr(false);
   saveState(); refreshLivePreviews();
   showSnackbar('Template loaded!');
 }
@@ -831,7 +899,7 @@ function buildPaperHTML() {
   const date = val('examDate').trim();
   const dur = val('duration').trim();
   const totalM = val('totalMarks').trim();
-  const instr = val('instructions').trim();
+  const instr = appSettings.autoInstructions ? autoInstructions().join('\n') : val('instructions').trim();
 
   let html = '<div class="pv-header-container">';
   html += '<div class="pv-header-top">';
@@ -855,11 +923,15 @@ function buildPaperHTML() {
   html += '</div>';
 
   if (appSettings.includeStudentBox) {
-    html += `<div class="pv-student-box">
-      <div><b>Name:</b> ___________________________</div>
-      <div><b>Roll No:</b> ____________</div>
-      <div><b>Section:</b> _______</div>
-    </div>`;
+    const sf = appSettings.studentFields || {};
+    const blank = ' ______________________';
+    let cells = '';
+    if (sf.name !== false) cells += `<div><b>Name:</b>${blank}</div>`;
+    if (sf.roll !== false) cells += `<div><b>Roll No:</b>${blank}</div>`;
+    if (sf.section !== false) cells += `<div><b>Section:</b>${blank}</div>`;
+    if (sf.date !== false) cells += `<div><b>Date:</b>${blank}</div>`;
+    if (sf.invigilator !== false) cells += `<div><b>Invigilator's Sign:</b>${blank}</div>`;
+    if (cells) html += `<div class="pv-student-box">${cells}</div>`;
   }
 
   if (instr) {
@@ -1281,11 +1353,12 @@ Fill-ups: 21-Urban
 > Tip: include examples`;
 }
 
-/* ---------- AI ENGINE: Google Gemini (zero setup for teachers) ---------- */
+/* ---------- AI ENGINE: Google Gemini via the site's Netlify proxy ---------- */
 /* NO API KEY IN SOURCE — GitHub secret scanning is right to block it, and the key
    must never be committed. The key lives server-side in the Netlify function proxy
-   (env var GEMINI_API_KEY), so browsers never see it. A teacher may still paste their
-   own free key in ⚙️ AI Settings (stored in their browser only) to override the proxy. */
+   (env var GEMINI_API_KEY), so browsers never see it and teachers need no setup at all.
+   If the AI is unreachable or its quota runs out, the built-in offline parser
+   takes over automatically. There is no key/settings UI in the app by design. */
 const GEMINI_DEFAULT_KEY = '';
 const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 const GEMINI_PROXY_URLS = ['/netlify/functions/gemini', '/api/gemini']; // 2nd route = edge fallback
@@ -1297,15 +1370,6 @@ function geminiKey() {
 function geminiModel() {
   try { return localStorage.getItem('tp_gemini_model') || GEMINI_DEFAULT_MODEL; }
   catch (e) { return GEMINI_DEFAULT_MODEL; }
-}
-function saveGeminiSettings() {
-  const v = (document.getElementById('geminiKeyInput').value || '').trim();
-  try {
-    if (v) localStorage.setItem('tp_gemini_key', v);
-    else localStorage.removeItem('tp_gemini_key');
-  } catch (e) {}
-  setAIStatus('info', v ? 'Custom API key saved' : 'Using the built-in default key');
-  showSnackbar('AI settings saved');
 }
 function setAIStatus(kind, text) {
   const el = document.getElementById('aiStatusLine');
@@ -1326,11 +1390,14 @@ Each array element is one question:
   "orAlternative": "..."
 }
 Field rules:
-- "type": "mcq" for multiple-choice (fill "options", 2-4 choices). "subjective" for True/False, fill-ups, short and long answers. "subq" for questions with (a)/(b)/(c) parts (fill "subQuestions"; "marks" = sum of part marks). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
+- "type": "mcq" for multiple-choice (fill "options", 2-4 choices) AND for True/False statements (fill "options": ["True","False"]). "subjective" for fill-ups, short and long answers. "subq" ONLY when the source prints separate marks for each (a)/(b)/(c) part (fill "subQuestions"; "marks" MUST equal the sum of the part marks; never repeat the part texts inside "text"). "or" for questions that give an OR choice (put the alternative question in "orAlternative").
 - Use only the keys that apply: "options" for mcq, "subQuestions" for subq, "orAlternative" for or. Keep "text", "type", "marks", "section" always.
 - "section": from headers like "SECTION A" / "Part B"; default "Section A". Marks from section headers (e.g. "2 marks each") or per-question marks; default 1.
 Cleaning rules:
 - Remove numbering (Q1, 1., (2)), markdown **bold**, emojis, answer keys, explanations, tips, teacher notes.
+- "options": plain choice text WITHOUT leading letters such as "(a)", "b)", "c." — the app prints its own lettering.
+- "section": the heading name WITHOUT any marks parenthesis — e.g. "Section A" or "SECTION A: Objective Type Questions", never "...(10 Marks)".
+- True/False statements: drop any trailing "[True / False]" tag from "text" (the type+options carry that meaning).
 - Keep original language of the question.
 - Never include answers in text.`;
 
@@ -1427,23 +1494,31 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
   if (replaceIfEmpty && !questions.length) questions = [];
   let add = 0;
   arr.forEach(o => {
-    const text = String(o.text || o.question || '').trim();
+    let text = String(o.text || o.question || '').trim();
     if (!text) return;
     if (questions.some(q => q.text === text)) return; // append-unique
     let type = String(o.type || '').toLowerCase().trim();
-    const opts = Array.isArray(o.options) ? o.options.map(s => String(s).trim()).filter(Boolean) : [];
+    const opts = Array.isArray(o.options)
+      ? o.options.map(s => String(s).trim()).filter(Boolean)
+          .map(s => s.replace(/^\(?\s*[a-dA-D]\s*[\.)]\s+/, '').trim()).filter(Boolean)  // drop '(a)'/'b)'/'c.' prefixes
+      : [];
     const rawSubs = Array.isArray(o.subQuestions) ? o.subQuestions : (Array.isArray(o.subParts) ? o.subParts : []);
     const orAlt = String(o.orAlternative || o.or || '').trim();
-    if (['mcq', 'objective', 'multiple choice', 'multiple-choice'].includes(type)) type = 'mcq';
+    let tfType = false;
+    if (['truefalse', 'true/false', 'tf', 'true-false', 'judgement'].includes(type)) { type = 'mcq'; tfType = true; }
+    else if (['mcq', 'objective', 'multiple choice', 'multiple-choice'].includes(type)) type = 'mcq';
     else if (['subq', 'sub-part', 'subparts', 'multi-part', 'compound'].includes(type)) type = 'subq';
     else if (['or', 'choice', 'either or'].includes(type)) type = 'or';
-    else if (['subjective', 'long', 'short', 'truefalse', 'true/false', 'fill', 'fillup', 'theory', 'descriptive'].includes(type)) type = 'subjective';
+    else if (['subjective', 'long', 'short', 'fill', 'fillup', 'theory', 'descriptive'].includes(type)) type = 'subjective';
     else if (opts.length >= 2) type = 'mcq';           // type missing/unrecognized -> auto-detect
     else if (rawSubs.length >= 2) type = 'subq';
     else if (orAlt) type = 'or';
     else type = 'subjective';
+    if (type === 'subjective' && /\[\s*true\s*\/\s*false\s*\]/i.test(text)) { type = 'mcq'; tfType = true; text = text.replace(/\[\s*true\s*\/\s*false\s*\]/i, '').trim(); }
+    if (type === 'mcq' && tfType && opts.length < 2) { opts.length = 0; opts.push('True', 'False'); }
     const marksRaw = parseInt(o.marks, 10) || 0;
-    const section = String(o.section || 'Section A').trim() || 'Section A';
+    let section = String(o.section || 'Section A').trim() || 'Section A';
+    section = section.replace(/\s*[\(\[]\s*\d+\s*marks?\s*[\)\]]\s*$/i, '').trim() || 'Section A'; // drop '(10 Marks)' from names
     const subQuestions = rawSubs.map((s, i) => ({
       label: String((s && s.label) || String.fromCharCode(97 + i)),
       text: String((s && (s.text || s.question)) || '').trim(),
@@ -1452,6 +1527,15 @@ function ingestQuestions(arr, replaceIfEmpty = false) {
     // for subq with no total marks, sum the part marks (matches offline parser)
     const marks = Math.max(1, marksRaw || (type === 'subq' && subQuestions.length
       ? subQuestions.reduce((s, x) => s + x.marks, 0) : 0) || 1);
+    if (type === 'subq' && subQuestions.length) {
+      const sum = subQuestions.reduce((s, x) => s + x.marks, 0);
+      if (sum !== marks) { // parts carry no printed marks -> one subjective question, pointers kept in text
+        const extra = subQuestions.map(s2 => '(' + s2.label + ') ' + s2.text).join(' ');
+        if (subQuestions[0].text && !text.includes(subQuestions[0].text)) text = (text + ' ' + extra).trim();
+        type = 'subjective';
+        subQuestions.splice(0, subQuestions.length);
+      }
+    }
     questions.push({
       id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       text, marks, type,
@@ -1495,36 +1579,6 @@ async function processWithAI() {
   }
 }
 
-async function testAIConnection() {
-  const box = document.getElementById('aiTestResult');
-  if (!box) return;
-  box.style.display = 'block';
-  const viaProxy = !geminiKey();
-  const label = viaProxy ? 'Site AI (Gemini via server proxy)' : ('Gemini (' + escapeHTML(geminiModel()) + ')');
-  box.innerHTML = '⏳ Testing ' + (viaProxy ? 'site AI…' : 'Gemini…');
-  const t0 = Date.now();
-  try {
-    const out = await geminiChat('Reply with exactly: OK', null);
-    const ms = Date.now() - t0;
-    box.innerHTML =
-      `<div>✅ <b>${label}</b> — ${ms} ms · replied "${escapeHTML(String(out).slice(0, 30))}"</div>` +
-      `<div>📋 <b>Offline parser</b> — built in, always works (automatic fallback)</div>` +
-      `<div class="ai-ok" style="margin-top:8px;">🎉 <b>AI is ready</b> — "Process with AI" will work. Teachers need zero setup.</div>`;
-    setAIStatus('ai', 'Gemini connection OK');
-  } catch (e) {
-    const msg = (e && e.message) || 'failed';
-    const keyProblem = /api[ _-]?key|403|400|PERMISSION|denied/i.test(msg);
-    box.innerHTML =
-      `<div>❌ <b>${label}</b> — ${escapeHTML(msg)}</div>` +
-      `<div>📋 <b>Offline parser</b> — built in, always works (automatic fallback)</div>` +
-      (viaProxy
-        ? `<div class="ai-bad" style="margin-top:8px;">Site AI proxy problem — on Netlify set <b>GEMINI_API_KEY</b> (Site configuration → Environment variables) and redeploy; or paste your own free key in AI Settings below.</div>`
-        : (keyProblem
-          ? `<div class="ai-bad" style="margin-top:8px;">Check / replace the API key in AI Settings below.</div>`
-          : `<div class="ai-warn" style="margin-top:8px;">Connection problem — the offline parser will be used automatically.</div>`));
-    setAIStatus('bad', 'Gemini unreachable: ' + msg);
-  }
-}
 
 /* ---------- QUESTION LIST ---------- */
 function renderQuestionsList() {
@@ -1533,7 +1587,7 @@ function renderQuestionsList() {
   if (badge) badge.textContent = questions.length;
   if (!box) return;
   if (!questions.length) {
-    box.innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-muted);">No questions yet</p>';
+    box.innerHTML = '<p style="text-align:center;padding:24px;color:var(--text-muted);">Add questions first — paste text above or use the Manual tab.</p>';
     updateSummary(); return;
   }
   const allSecs = [...new Set([...sections, ...questions.map(q=>q.section)])].filter(Boolean);
@@ -1640,14 +1694,16 @@ async function downloadPDF(){
     printPaper();
     return;
   }
-  showSnackbar('Building HD PDF…');
+  showSnackbar('Building PDF…');
 
-  // Use VISIBLE final preview clone path (fixes blank pdf)
-  const source = document.getElementById('finalPreview');
-  if (!source) { showSnackbar('Preview missing'); return; }
-
-  // Ensure latest HTML
+  // Clean off-screen capture node: exact content width, zero wrapper padding and
+  // zero trailing margins -> PDF matches the preview with NO extra blank last page.
   refreshLivePreviews();
+  const source = document.createElement('div');
+  source.id = 'pdfCapture';
+  source.style.cssText = 'position:fixed;left:-10000px;top:0;width:180mm;margin:0;padding:0;background:#fff;color:#000;';
+  source.innerHTML = '<style>#pdfCapture>:last-child{margin-bottom:0!important;}#pdfCapture .pv-question{margin-bottom:14px;}#pdfCapture .pv-question:last-child{margin-bottom:0!important;}</style>' + buildPaperHTML();
+  document.body.appendChild(source);
   await new Promise(r => setTimeout(r, 350)); // paint delay for logo/fonts
 
   const filename = ((val('subject')||'Test').replace(/\s+/g,'_')) + '_Paper.pdf';
@@ -1672,23 +1728,12 @@ async function downloadPDF(){
 
   try {
     await html2pdf().set(opt).from(source).save();
-    showSnackbar('HD PDF downloaded!');
+    showSnackbar('PDF downloaded!');
   } catch (e) {
     console.error(e);
-    // fallback: temporary on-screen render node
-    const hold = document.createElement('div');
-    hold.style.cssText = 'position:fixed;left:0;top:0;width:210mm;padding:15mm 18mm;background:#fff;color:#000;font-family:Times New Roman,serif;font-size:14px;z-index:-1;opacity:0.01;pointer-events:none;';
-    hold.innerHTML = buildPaperHTML();
-    document.body.appendChild(hold);
-    await new Promise(r => setTimeout(r, 400));
-    try {
-      await html2pdf().set(opt).from(hold).save();
-      showSnackbar('HD PDF downloaded!');
-    } catch (e2) {
-      showSnackbar('PDF failed — try Print instead');
-    }
-    document.body.removeChild(hold);
+    showSnackbar('PDF failed — try Print instead');
   }
+  document.body.removeChild(source);
 }
 
 function printPaper(){
@@ -1697,5 +1742,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a484692eeb69598a',t:'MTc5MTYyMjU3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a486e612ad1c91a4',t:'MTc5MTY0ODY2Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
