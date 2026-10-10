@@ -1288,7 +1288,7 @@ Fill-ups: 21-Urban
    own free key in ⚙️ AI Settings (stored in their browser only) to override the proxy. */
 const GEMINI_DEFAULT_KEY = '';
 const GEMINI_DEFAULT_MODEL = 'gemini-3.5-flash-lite';
-const GEMINI_PROXY_URL = '/netlify/functions/gemini';
+const GEMINI_PROXY_URLS = ['/netlify/functions/gemini', '/api/gemini']; // 2nd route = edge fallback
 
 function geminiKey() {
   try { return (localStorage.getItem('tp_gemini_key') || '').trim() || GEMINI_DEFAULT_KEY; }
@@ -1338,12 +1338,14 @@ async function geminiChat(prompt, systemPrompt) {
   const key = geminiKey();            // '' unless this browser has its own key saved
   const model = geminiModel();
   const viaProxy = !key;              // no personal key -> site's server-side proxy holds the key
+  const urls = viaProxy ? GEMINI_PROXY_URLS : [null];
   let lastErr = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
+  for (let u = 0; u < urls.length; u++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
       let url, reqBody;
       if (viaProxy) {
-        url = GEMINI_PROXY_URL;
+        url = urls[u];
         reqBody = { model: model, prompt: prompt, systemPrompt: systemPrompt || '' };
       } else {
         url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) +
@@ -1363,10 +1365,12 @@ async function geminiChat(prompt, systemPrompt) {
       const emsg = (data.error && (data.error.message || data.error)) || '';
       if (!res.ok || emsg || data.ok === false) {
         let msg = emsg || ('HTTP ' + res.status);
-        if (viaProxy && res.status === 404) msg = 'Site AI proxy not found (deploy netlify/functions/gemini.js)';
+        if (viaProxy && res.status === 404) msg = 'Site AI proxy not found on ' + url + ' (deploy netlify/functions/gemini.js)';
         const err = new Error(msg);
         err.status = res.status;
-        if (res.status === 400 || res.status === 403 || res.status === 404) throw err; // fail fast
+        if (res.status === 400 || res.status === 403) throw err;        // fail fast
+        if (viaProxy && res.status === 404) { lastErr = err; break; }   // try next proxy route
+        if (res.status === 404) throw err;                              // direct mode: fail fast
         lastErr = err;
         await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
         continue;
@@ -1381,9 +1385,10 @@ async function geminiChat(prompt, systemPrompt) {
       if (!text) throw new Error('Empty response from Gemini');
       return text;
     } catch (e) {
-      if (e && e.status) throw e;                       // HTTP 4xx — do not retry
-      lastErr = e;                                      // network error — retry
-      await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+        if (e && e.status) throw e;                     // HTTP 4xx — do not retry
+        lastErr = e;                                    // network error — retry
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+      }
     }
   }
   throw lastErr || new Error('Gemini request failed');
@@ -1692,5 +1697,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4839daa4b0b91e8',t:'MTc5MTYxNDI0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a484692eeb69598a',t:'MTc5MTYyMjU3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
