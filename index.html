@@ -620,6 +620,12 @@ window.addEventListener('DOMContentLoaded', () => {
   addSubPartRow();
   try { syncLayoutUI(); } catch (e) {}
   try {
+    if (questions.length && !Object.keys(sectionRules).length && !sessionStorage.getItem('tp_rule_hint')) {
+      sessionStorage.setItem('tp_rule_hint', '1');
+      setTimeout(() => showSnackbar('Tip: re-paste the source text & press Process once to restore "attempt any X of Y" totals'), 1200);
+    }
+  } catch (e) {}
+  try {
     if (val('examDate').trim() && appSettings.studentFields && appSettings.studentFields.date !== false) {
       appSettings.studentFields.date = false; syncLayoutUI();
     }
@@ -677,13 +683,20 @@ function setupAutoSave() {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', () => { saveState(); refreshLivePreviews(); });
   });
+  let pt = null;
+  const pa = document.getElementById('pasteArea');
+  if (pa) pa.addEventListener('input', () => {
+    clearTimeout(pt);
+    pt = setTimeout(() => { saveState(); }, 700);   // debounced: big pastes stay smooth
+  });
 }
 function saveState() {
   const data = {
     schoolName: val('schoolName'), examTitle: val('examTitle'), subject: val('subject'),
     classGrade: val('classGrade'), teacherName: val('teacherName'), examDate: val('examDate'),
     duration: val('duration'), totalMarks: val('totalMarks'), instructions: val('instructions'),
-    logo: logoBase64, questions, sections, appSettings, sectionRules
+    logo: logoBase64, questions, sections, appSettings, sectionRules,
+    pasteRaw: (document.getElementById('pasteArea') || {}).value || ''
   };
   try { localStorage.setItem('tp_master_v2', JSON.stringify(data)); } catch(e) {}
 }
@@ -705,6 +718,11 @@ function loadState() {
     if (Array.isArray(d.questions)) questions = d.questions;
     if (Array.isArray(d.sections) && d.sections.length) sections = d.sections;
     if (d.sectionRules && typeof d.sectionRules === 'object') sectionRules = d.sectionRules;
+    if (typeof d.pasteRaw === 'string' && d.pasteRaw) {
+      const pa = document.getElementById('pasteArea');
+      if (pa && !pa.value) pa.value = d.pasteRaw;
+      Object.assign(sectionRules, extractSectionRules(d.pasteRaw));
+    }
     if (d.appSettings) {
       appSettings = Object.assign(appSettings, d.appSettings);
       const a = document.getElementById('toggleAnswerLines');
@@ -823,11 +841,20 @@ function extractSectionRules(raw) {
   return rules;
 }
 
+function getRule(sec) {
+  // Rules are stored under clean keys ('Section C'); question sections may be
+  // full headings ('SECTION C: Short Answer ...'). Match by section LETTER.
+  const s = String(sec || '');
+  const m = s.match(/(?:section|part)\s*([A-Za-z])/i) || s.match(/^\s*([A-Za-z])\s*$/);
+  if (!m) return null;
+  return sectionRules['Section ' + m[1].toUpperCase()] || null;
+}
+
 function sectionStats(sec, list) {
   // Effective (max obtainable) marks for a section: with an attempt rule the
   // total is attempt x per-question marks, NOT the sum of every printed question.
   const sum = list.reduce((a, q) => a + (parseInt(q.marks, 10) || 0), 0);
-  const r = sectionRules[sec];
+  const r = getRule(sec);
   if (r && r.attempt && list.length > r.attempt) {
     const perQ = sum / list.length;
     return { marks: Math.round(r.attempt * perQ), attempt: r.attempt, outOf: list.length };
@@ -872,7 +899,7 @@ function autoInstructions() {
       else if (m === 3 || m === 4) line += ' Answer to these questions shall be written in 80 to 100 words.';
       else if (m >= 5) line += ' Answer to these questions shall be written in 120 to 150 words.';
     }
-    const rule = sectionRules[sec];
+    const rule = getRule(sec);
     if (rule && rule.attempt && rule.attempt < list.length) {
       line += ' Attempt any ' + rule.attempt + ' out of ' + list.length + ' questions in this section.';
     }
@@ -1881,5 +1908,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4876bd50b6d7f23',t:'MTc5MTY1NDE0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4878286d9b0918a',t:'MTc5MTY1NTA3MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
