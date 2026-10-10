@@ -600,6 +600,7 @@ let manualType = 'subjective';
 let currentStep = 1;
 let logoBase64 = '';
 let currentManualImage = '';
+let sectionRules = {};   // per-section attempt rules, e.g. { 'Section C': { attempt: 5, outOf: 7 } }
 let appSettings = { showAnswerLines: false, includeStudentBox: true, autoInstructions: true,
   studentFields: { name: true, roll: true, section: true, date: true, invigilator: true } };
 
@@ -682,7 +683,7 @@ function saveState() {
     schoolName: val('schoolName'), examTitle: val('examTitle'), subject: val('subject'),
     classGrade: val('classGrade'), teacherName: val('teacherName'), examDate: val('examDate'),
     duration: val('duration'), totalMarks: val('totalMarks'), instructions: val('instructions'),
-    logo: logoBase64, questions, sections, appSettings
+    logo: logoBase64, questions, sections, appSettings, sectionRules
   };
   try { localStorage.setItem('tp_master_v2', JSON.stringify(data)); } catch(e) {}
 }
@@ -703,6 +704,7 @@ function loadState() {
     }
     if (Array.isArray(d.questions)) questions = d.questions;
     if (Array.isArray(d.sections) && d.sections.length) sections = d.sections;
+    if (d.sectionRules && typeof d.sectionRules === 'object') sectionRules = d.sectionRules;
     if (d.appSettings) {
       appSettings = Object.assign(appSettings, d.appSettings);
       const a = document.getElementById('toggleAnswerLines');
@@ -797,6 +799,42 @@ const STANDARD_INSTR_FALLBACK = [
 /* Builds CBSE-style standard instructions that ADAPT to the actual paper:
    total count, section letters, question-number ranges, type names, marks,
    word limits, VI-note (only if the paper has images/map sections), choice line. */
+function extractSectionRules(raw) {
+  // Reads "Attempt any X out of Y" rules from the pasted source, per section.
+  // Handles headings ("SECTION C: ... (Attempt any 5 out of 7 x 3 = 15 Marks)")
+  // and mark-table rows ("| C | Attempt any 5 out of 7 x 3 Marks | 15 |").
+  const rules = {};
+  let cur = null;
+  String(raw || '').split(/\r?\n/).forEach(line => {
+    const clean = line.replace(/\*/g, '').replace(/_/g, ' ');
+    const h = clean.match(/^\s*(?:#+\s*)?SECTION\s*([A-Za-z])\b/i);
+    if (h) cur = 'Section ' + h[1].toUpperCase();
+    const a = clean.match(/attempt\s+(?:any\s+)?(\d+)\s+out\s+of\s+(\d+)/i);
+    if (!a) return;
+    const attempt = parseInt(a[1], 10), outOf = parseInt(a[2], 10);
+    if (!(attempt > 0) || !(outOf >= attempt)) return;
+    let key = cur;
+    if (!key) {
+      const t = clean.match(/^\s*\|?\s*([A-Z])\s*\|/);
+      if (t) key = 'Section ' + t[1];
+    }
+    if (key) rules[key] = { attempt, outOf };
+  });
+  return rules;
+}
+
+function sectionStats(sec, list) {
+  // Effective (max obtainable) marks for a section: with an attempt rule the
+  // total is attempt x per-question marks, NOT the sum of every printed question.
+  const sum = list.reduce((a, q) => a + (parseInt(q.marks, 10) || 0), 0);
+  const r = sectionRules[sec];
+  if (r && r.attempt && list.length > r.attempt) {
+    const perQ = sum / list.length;
+    return { marks: Math.round(r.attempt * perQ), attempt: r.attempt, outOf: list.length };
+  }
+  return { marks: sum, attempt: 0, outOf: list.length };
+}
+
 function autoInstructions() {
   if (!questions.length) return [];
   const lines = [];
@@ -833,6 +871,10 @@ function autoInstructions() {
       if (m === 2) line += ' Answer to these questions shall be written in 30 to 50 words.';
       else if (m === 3 || m === 4) line += ' Answer to these questions shall be written in 80 to 100 words.';
       else if (m >= 5) line += ' Answer to these questions shall be written in 120 to 150 words.';
+    }
+    const rule = sectionRules[sec];
+    if (rule && rule.attempt && rule.attempt < list.length) {
+      line += ' Attempt any ' + rule.attempt + ' out of ' + list.length + ' questions in this section.';
     }
     lines.push(line);
     num += list.length;
@@ -994,8 +1036,10 @@ function buildPaperHTML() {
 
   let qNum = 1;
   Object.entries(grouped).forEach(([sec, list]) => {
-    const secMarks = list.reduce((a,q) => a + (parseInt(q.marks,10)||0), 0);
-    html += `<div class="pv-section-title">${escapeHTML(sec)} (${secMarks} Marks)</div>`;
+    const st = sectionStats(sec, list);
+    html += `<div class="pv-section-title">${escapeHTML(sec)}${st.attempt
+      ? ` (Attempt any ${st.attempt} out of ${st.outOf} = ${st.marks} Marks)`
+      : ` (${st.marks} Marks)`}</div>`;
     list.forEach(q => {
       html += `<div class="pv-question"><div class="pv-q-text">`;
       html += `<b>${qNum}.</b> ${escapeHTML(q.text || '')}`;
@@ -1223,6 +1267,7 @@ function preprocess(raw) {
 function processOffline() {
   const raw = document.getElementById('pasteArea').value.trim();
   if (!raw) { showSnackbar('Paste text first'); return; }
+  Object.assign(sectionRules, extractSectionRules(raw));
   const text = preprocess(raw);
   if (!text) { showSnackbar('Nothing left after cleaning'); return; }
 
@@ -1621,6 +1666,7 @@ function hideBusy() {
 async function processWithAI() {
   const raw = (document.getElementById('pasteArea').value || '').trim();
   if (!raw) { showSnackbar('Paste some text first'); return; }
+  Object.assign(sectionRules, extractSectionRules(raw));
   setAIStatus('ai', (geminiKey() ? 'Gemini' : 'Site AI') + ' is reading your text…');
   const t0 = Date.now();
   const capped = raw.length > 24000 ? raw.slice(0, 24000) : raw;
@@ -1749,8 +1795,11 @@ function updateSummary(){
   const el=document.getElementById('summaryContent'); if(!el)return;
   const declared=parseInt(val('totalMarks'),10)||0;
   const g={}; let total=0;
-  questions.forEach(q=>{ const s=q.section||'Section A'; if(!g[s])g[s]={c:0,m:0}; g[s].c++; g[s].m+=(+q.marks||0); total+=(+q.marks||0); });
-  let h=Object.entries(g).map(([s,d])=>`<div class="summary-row"><span>${escapeHTML(s)} (${d.c})</span><span>${d.m}</span></div>`).join('');
+  questions.forEach(q=>{ const s=q.section||'Section A'; if(!g[s])g[s]=[]; g[s].push(q); });
+  let h=Object.entries(g).map(([s,list])=>{
+    const st=sectionStats(s,list); total+=st.marks;
+    return `<div class="summary-row"><span>${escapeHTML(s)} (${st.outOf} Qs${st.attempt?', attempt '+st.attempt:''})</span><span>${st.marks}</span></div>`;
+  }).join('');
   h+=`<div class="summary-row total"><span>Total</span><span>${total} / ${declared||'—'}</span></div>`;
   if(declared && total!==declared){
     const diff=Math.abs(declared-total);
@@ -1832,5 +1881,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48740e8d9de54cb',t:'MTc5MTY1MjM4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4876bd50b6d7f23',t:'MTc5MTY1NDE0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
