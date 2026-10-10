@@ -39,7 +39,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'GET') {
     return json(200, { ok: true, service: 'gemini-proxy', configured: !!process.env.GEMINI_API_KEY });
   }
-  if (event.httpMethod !== 'POST') return json(405, { ok: false, error: 'Use POST' });
+  if (event.httpMethod !== 'POST' && event.httpMethod !== 'PUT') return json(405, { ok: false, error: 'Use POST' });
 
   // optional origin allowlist
   const allowed = String(process.env.ALLOWED_ORIGINS || '')
