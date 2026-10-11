@@ -69,6 +69,10 @@
     --shadow-md: 0 15px 35px rgba(15, 23, 42, 0.12);
   }
 
+  /* Freeze theme transitions while the capture pin is active, so reverting the
+     pin is an instant repaint (no visible fade) once the overlay lifts. */
+  html.no-trans, html.no-trans * { transition: none !important; }
+
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { min-height: 100%; font-family: 'Outfit', sans-serif; background-color: var(--bg-main); color: var(--text-main); transition: background 0.2s, color 0.2s; }
   .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
@@ -169,7 +173,7 @@
   @media print {
     body, html { background: #FFFFFF !important; }
     .topbar, .stepper, .btn-row, .no-print,
-    #welcomeModal, #snackbar { display: none !important; }
+    #welcomeModal, #snackbar, #busyOverlay { display: none !important; }
     .main { max-width: 100% !important; padding: 0 !important; }
     .step-page { display: none !important; }
     #page4 { display: block !important; }
@@ -1955,16 +1959,21 @@ async function downloadPDF(){
     printPaper();
     return;
   }
-  showSnackbar('Building PDF…');
+  // Capture runs behind an OPAQUE busy overlay: the light-palette pin needed by
+  // the renderer must never be visible as a theme flash to the user.
+  showBusy('Building PDF…');
+  const _ov = document.getElementById('busyOverlay');
+  const _ovBg = _ov ? _ov.style.background : '';
+  if (_ov) _ov.style.background = '#080A0E';
   refreshLivePreviews();
   await new Promise(r => setTimeout(r, 350)); // paint delay for logo/fonts
 
   // Capture the SAME node the user sees in the preview, so the PDF can never
   // differ from it. The pdf-capture class only strips the trailing margin.
   const source = document.getElementById('finalPreview');
-  if (!source) { showSnackbar('Preview missing'); return; }
+  if (!source) { if (_ov) _ov.style.background = _ovBg; hideBusy(); showSnackbar('Preview missing'); return; }
   source.classList.add('pdf-capture');
-  document.documentElement.classList.add('force-light');
+  document.documentElement.classList.add('force-light', 'no-trans');
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const filename = ((val('subject')||'Test').replace(/\s+/g,'_')) + '_Paper.pdf';
@@ -2014,7 +2023,8 @@ async function downloadPDF(){
     }
     if (inkRatio(canvas) < 0.002) {
       source.classList.remove('pdf-capture');
-      document.documentElement.classList.remove('force-light');
+      document.documentElement.classList.remove('force-light', 'no-trans');
+      if (_ov) _ov.style.background = _ovBg; hideBusy();
       showSnackbar('PDF render failed on this device — opening Print instead');
       printPaper();
       return;
@@ -2033,7 +2043,8 @@ async function downloadPDF(){
         for (let i = 0; i < d.length; i += 8) { if (d[i] < 150 && d[i+1] < 150 && d[i+2] < 150 && d[i+3] > 10) darkPx++; }
         if (darkPx < 4) {
           source.classList.remove('pdf-capture');
-          document.documentElement.classList.remove('force-light');
+          document.documentElement.classList.remove('force-light', 'no-trans');
+          if (_ov) _ov.style.background = _ovBg; hideBusy();
           showSnackbar('PDF render failed on this device — opening Print instead');
           printPaper();
           return;
@@ -2075,6 +2086,10 @@ async function downloadPDF(){
   }
   source.classList.remove('pdf-capture');
   document.documentElement.classList.remove('force-light');
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); // settle under overlay
+  document.documentElement.classList.remove('no-trans');
+  if (_ov) _ov.style.background = _ovBg;
+  hideBusy();
 }
 
 function printPaper(){
@@ -2083,5 +2098,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c7fc1c9527ec6',t:'MTc5MTcwNzM4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c92e0c8375a26',t:'MTc5MTcwODE3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
