@@ -385,12 +385,25 @@ The parser will automatically:
 • Detect sections and marks
 • Build clean questions"></textarea>
             </div>
+            <details style="margin:10px 0 0;background:var(--bg-section);border:1px solid var(--border-color);border-radius:12px;padding:10px 14px;">
+              <summary style="cursor:pointer;font-weight:700;font-size:0.82rem;">Formatting tips for a perfect Instant Parse (no AI)</summary>
+              <ul style="margin:8px 0 2px 18px;font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+                <li>One question per numbered line: <b>1. question text</b></li>
+                <li>Options on their own lines: <b>(a) …</b> <b>(b) …</b> (same line also works)</li>
+                <li>Marks in brackets at the end: <b>(2)</b> or <b>(2 Marks)</b></li>
+                <li>Section headings on their own line: <b>SECTION B …</b> — add <b>× 3 = 15 Marks</b> or <b>(3 marks each)</b> for per-question marks, and <b>(Attempt any 5 out of 7 …)</b> for attempt rules</li>
+                <li>True/False: end the statement with <b>[True / False]</b>, or put questions under a <b>True or False</b> sub-heading</li>
+                <li>OR choice: keep <b>OR</b> on its own line between the two alternatives</li>
+                <li>Fill-ups: blanks like <b>______</b> or <b>……</b> are detected</li>
+                <li>Answer key at the end is fine — parsing stops there automatically</li>
+              </ul>
+            </details>
             <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
               <button class="btn btn-primary" onclick="processWithAI()">
                 <span class="material-symbols-rounded">auto_awesome</span> Process with AI
               </button>
               <button class="btn btn-secondary" onclick="processOffline()">
-                <span class="material-symbols-rounded">bolt</span> Parse Questions
+                <span class="material-symbols-rounded">bolt</span> Instant Parse (no AI)
               </button>
               <button class="btn btn-secondary" onclick="document.getElementById('pasteArea').value=''">Clear</button>
             </div>
@@ -825,6 +838,19 @@ const STANDARD_INSTR_FALLBACK = [
 /* Builds CBSE-style standard instructions that ADAPT to the actual paper:
    total count, section letters, question-number ranges, type names, marks,
    word limits, VI-note (only if the paper has images/map sections), choice line. */
+function extractPaperMeta(raw) {
+  // Reads declared paper metadata so Details fills itself:
+  // "Maximum Marks: 50", "Total: 50 Marks", "Time Allowed: 2 Hours"
+  const t = String(raw || '');
+  const m = t.match(/maximum\s+marks?[^\d]{0,12}(\d{1,3})/i)
+         || t.match(/total[^\d\n]{0,24}?\b(\d{1,3})\s*marks\b/i);
+  const dur = t.match(/time\s+allowed[^\d]{0,12}(\d{1,2}(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?)?/i);
+  return {
+    marks: m ? parseInt(m[1], 10) : null,
+    time: dur ? (dur[1] + ' ' + (dur[2] ? dur[2].replace(/\.$/, '') : 'Hours')) : null
+  };
+}
+
 function extractSectionRules(raw) {
   // Reads per-section rules from the pasted source:
   //  - "Attempt any X out of Y" ONLY from section heading lines or mark-table
@@ -1296,6 +1322,7 @@ function preprocess(raw) {
   t = t.replace(/^#{1,6}\s+/gm,'');
   t = t.replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*\n]+)\*/g,'$1');
   t = t.replace(/^\s*>\s?/gm, '');   // markdown quote prefixes
+  t = t.replace(/^([ \t]*)[-•+][ \t]+/gm, '$1');   // markdown bullet prefixes
   t = t.replace(/^[\-*_]{3,}\s*$/gm,'');
   t = t.replace(/^\s*\|.*\|\s*$/gm,''); // tables
   t = t.replace(/^\s*\|?[\s\-:|]+\|?\s*$/gm,'');
@@ -1319,6 +1346,9 @@ function processOffline() {
   const raw = document.getElementById('pasteArea').value.trim();
   if (!raw) { showSnackbar('Paste text first'); return; }
   Object.assign(sectionRules, extractSectionRules(raw));
+  const meta0 = extractPaperMeta(raw);
+  if (meta0.marks && !val('totalMarks').trim()) document.getElementById('totalMarks').value = String(meta0.marks);
+  if (meta0.time && !val('duration').trim()) document.getElementById('duration').value = meta0.time;
   const text = preprocess(raw);
   if (!text) { showSnackbar('Nothing left after cleaning'); return; }
 
@@ -1326,7 +1356,8 @@ function processOffline() {
   let curSec = sections[0] || 'Section A';
   let pendingMarks = null;
   let curTf = false;
-  let started = false;   // ignore unnumbered preamble (titles etc.) before first heading/question
+  let started = false;
+  const secPair = {};   // 'A × B = total' pairs, disambiguated later by question count   // ignore unnumbered preamble (titles etc.) before first heading/question
   let buf = null;
   const out = [];
 
@@ -1335,6 +1366,7 @@ function processOffline() {
     let rawQ = buf.raw.trim();
     if (!rawQ) { buf = null; return; }
     rawQ = rawQ.replace(/^\s*(?:Q(?:uestion)?\.?\s*)?(?:\d+|[ivxIVX]+)\s*[\)\.\:\-]\s*/i,'').trim();
+    rawQ = rawQ.replace(/\((?:internal choice|attempt any one|attempt any 1)[^)]*\)/gi, '').trim();
     if (rawQ.length < 4) { buf = null; return; }
 
     let marks = buf.pm || 1;
@@ -1346,7 +1378,7 @@ function processOffline() {
     // OR
     const orParts = rawQ.split(/\n\s*OR\s*\n/i);
     if (orParts.length >= 2) {
-      const cleanPart = (x) => x.replace(/^\s*>\s?/gm, '').replace(/^\(([ab])\)\s*/gmi, '').replace(/\(internal choice[^)]*\)/i, '').trim();
+      const cleanPart = (x) => x.replace(/^\s*>\s?/gm, '').replace(/^\(([ab])\)\s*/gmi, '').replace(/\((?:internal choice|attempt any one)[^)]*\)/gi, '').replace(/[\(\[\{]\s*\d{1,2}\s*marks?\s*[\)\]\}]/gi, '').replace(/\s*\n\s*/g, ' ').trim();
       let a = cleanPart(orParts[0]), b = cleanPart(orParts[1]);
       const mm = a.match(/[\(\[\{]\s*(\d{1,2})\s*(?:marks?)?\s*[\)\]\}]\s*$/i);
       if (mm) { marks = parseInt(mm[1],10); a = a.replace(/[\(\[\{]\s*\d{1,2}\s*(?:marks?)?\s*[\)\]\}]\s*$/i,'').trim(); }
@@ -1415,7 +1447,7 @@ function processOffline() {
     if (type !== 'mcq') {
       if (/true\s*(or|\/)\s*false/i.test(rawQ)) type = 'tf';
       else if (buf.tf) type = 'tf';
-      else if (/_{3,}/.test(rawQ)) type = 'fill';
+      else if (/_{3,}|…|\.{4,}/.test(rawQ)) type = 'fill';
     }
     if (type === 'tf') rawQ = rawQ.replace(/[\[\(]\s*true\s*\/\s*false\s*[\]\)]/i, '').trim();
 
@@ -1452,15 +1484,20 @@ function processOffline() {
       if (short) name = short[1].charAt(0).toUpperCase() + short[1].slice(1).toLowerCase() + ' ' + short[2].toUpperCase();
       if (!sections.includes(name)) sections.push(name);
       curSec = name;
-      curTf = false;
+      curTf = /true\s*(?:or|\/)\s*false/i.test(L);   // "SECTION B: True or False (1 Mark each)"
       started = true;
       const mm = L.match(secMarkRe);
       pendingMarks = mm ? parseInt(mm[1] || mm[2] || mm[3] || mm[4], 10) : null;
+      const xp = L.match(/(\d{1,2})\s*×\s*(\d{1,2})\s*=/);
+      if (xp) secPair[name] = [parseInt(xp[1], 10), parseInt(xp[2], 10)];
       continue;
     }
 
     // sub-headings like "II. True or False (1 Mark each)" / "I. Multiple Choice
     // Questions (1 Mark each)" set context instead of becoming fake questions
+    if (/^\(\s*(?:all questions are compulsory|attempt any|internal choice|answer in|word limit)/i.test(L)) continue;
+    if (/^(?:all questions are compulsory|read the (?:question|following)|instructions?\s*:|note\s*:)/i.test(L)) continue;
+
     const sh = L.match(/^(?:[ivxIVX]+|\d+)[\.\)\:]-?\s+(.{0,80})$/i);
     const isTfTag = /[\[\(]\s*true\s*\/\s*false\s*[\]\)]/i.test(L);
     if (sh && !isTfTag && /(marks?\s*each|true\s*(?:or|\/)\s*false|false\s*(?:or|\/)\s*true|multiple choice|objective type|objective questions)/i.test(sh[1]) && !/\?/.test(L) && L.length < 80) {
@@ -1483,6 +1520,17 @@ function processOffline() {
     }
   }
   commit();
+
+  // "5 × 1 = 5" vs "1 × 5 = 5": the factor that is NOT the question count is the
+  // per-question marks. Default (count matches neither) keeps the standard
+  // "questions × marks" reading.
+  Object.keys(secPair).forEach(sec => {
+    const pair = secPair[sec];
+    const list = out.filter(q => q.section === sec);
+    if (!list.length || pair[0] === pair[1]) return;
+    const perQ = (list.length === pair[1]) ? pair[0] : pair[1];
+    if (perQ !== pair[1]) list.forEach(q => { if (q.marks === pair[1]) q.marks = perQ; });
+  });
 
   if (!out.length) { showSnackbar('No questions found'); return; }
   // replace on fresh paste feel if list empty-ish, else append unique
@@ -1741,6 +1789,9 @@ async function processWithAI() {
   const raw = (document.getElementById('pasteArea').value || '').trim();
   if (!raw) { showSnackbar('Paste some text first'); return; }
   Object.assign(sectionRules, extractSectionRules(raw));
+  const meta0 = extractPaperMeta(raw);
+  if (meta0.marks && !val('totalMarks').trim()) document.getElementById('totalMarks').value = String(meta0.marks);
+  if (meta0.time && !val('duration').trim()) document.getElementById('duration').value = meta0.time;
   setAIStatus('ai', (geminiKey() ? 'Gemini' : 'Site AI') + ' is reading your text…');
   const t0 = Date.now();
   const capped = raw.length > 24000 ? raw.slice(0, 24000) : raw;
@@ -1960,5 +2011,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c180209e2d920',t:'MTc5MTcwMzEzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c3ea91be9407d',t:'MTc5MTcwNDcyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
