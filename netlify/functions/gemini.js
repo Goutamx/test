@@ -58,6 +58,11 @@ exports.handler = async (event) => {
     });
   }
 
+  // Capture Paper sends base64 photos; keep requests inside Lambda payload limits
+  if (event.body && event.body.length > 5500000) {
+    return json(413, { ok: false, error: 'Request too large — use up to 4 smaller photos' });
+  }
+
   let body;
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return json(400, { ok: false, error: 'Invalid JSON body' }); }
@@ -67,8 +72,15 @@ exports.handler = async (event) => {
   const systemPrompt = String(body.systemPrompt || '').slice(0, 4000);
   if (!prompt.trim()) return json(400, { ok: false, error: 'Empty prompt' });
 
+  // optional vision parts (Capture Paper): up to 4 base64 images before the text
+  const images = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
+  const vparts = images
+    .filter((im) => im && typeof im.mime_type === 'string' && typeof im.data === 'string' && im.data.length <= 2000000)
+    .map((im) => ({ inline_data: { mime_type: im.mime_type, data: im.data } }));
+  vparts.push({ text: prompt });
+
   const payload = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts: vparts }],
     generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
   };
   if (systemPrompt) payload.systemInstruction = { parts: [{ text: systemPrompt }] };
