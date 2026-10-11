@@ -56,6 +56,19 @@
     --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.5);
   }
 
+  /* Capture/print pin: html2canvas paints paper text with the ROOT inherited
+     color (the theme's --text-main), ignoring the paper's own black ink. In dark
+     theme that means near-white glyphs on white paper = invisible. Pinning the
+     palette to light while capturing makes every theme produce identical paper. */
+  html.force-light {
+    --bg-main: #F1F5F9; --bg-card: #FFFFFF; --bg-input: #F8FAFC; --bg-input-focus: #FFFFFF;
+    --bg-chip: #E2E8F0; --bg-section: #F8FAFC; --primary: #1E3A8A; --accent: #2563EB;
+    --accent-ai: #8B5CF6; --text-main: #0F172A; --text-muted: #64748B; --text-soft: #94A3B8;
+    --border-color: #E2E8F0; --success: #059669; --error: #DC2626; --warning: #D97706;
+    --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.04); --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+    --shadow-md: 0 15px 35px rgba(15, 23, 42, 0.12);
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { min-height: 100%; font-family: 'Outfit', sans-serif; background-color: var(--bg-main); color: var(--text-main); transition: background 0.2s, color 0.2s; }
   .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
@@ -1951,6 +1964,8 @@ async function downloadPDF(){
   const source = document.getElementById('finalPreview');
   if (!source) { showSnackbar('Preview missing'); return; }
   source.classList.add('pdf-capture');
+  document.documentElement.classList.add('force-light');
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   const filename = ((val('subject')||'Test').replace(/\s+/g,'_')) + '_Paper.pdf';
   const opt = {
@@ -1999,10 +2014,32 @@ async function downloadPDF(){
     }
     if (inkRatio(canvas) < 0.002) {
       source.classList.remove('pdf-capture');
+      document.documentElement.classList.remove('force-light');
       showSnackbar('PDF render failed on this device — opening Print instead');
       printPaper();
       return;
     }
+    // Text-ink guard: rules/logo can survive even when glyphs do not paint, so
+    // explicitly demand dark ink inside the first question's band.
+    try {
+      const qEl = source.querySelector('.pv-question');
+      if (qEl) {
+        const sc = canvas.width / (source.offsetWidth || canvas.width);
+        const r0 = qEl.getBoundingClientRect(), rS = source.getBoundingClientRect();
+        const y0 = Math.max(0, Math.floor((r0.top - rS.top + 4) * sc));
+        const hB = Math.min(Math.max(8, Math.floor(26 * sc)), canvas.height - y0);
+        const d = canvas.getContext('2d').getImageData(0, y0, canvas.width, hB).data;
+        let darkPx = 0;
+        for (let i = 0; i < d.length; i += 8) { if (d[i] < 150 && d[i+1] < 150 && d[i+2] < 150 && d[i+3] > 10) darkPx++; }
+        if (darkPx < 4) {
+          source.classList.remove('pdf-capture');
+          document.documentElement.classList.remove('force-light');
+          showSnackbar('PDF render failed on this device — opening Print instead');
+          printPaper();
+          return;
+        }
+      }
+    } catch (e) { console.warn('text-ink check skipped:', e); }
     // Blank-last-page guard: if the final page slice of the canvas has no ink
     // at all, drop that page before saving.
     let blankLast = false;
@@ -2037,6 +2074,7 @@ async function downloadPDF(){
     showSnackbar('PDF failed — try Print instead');
   }
   source.classList.remove('pdf-capture');
+  document.documentElement.classList.remove('force-light');
 }
 
 function printPaper(){
@@ -2045,5 +2083,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c5f127893922a',t:'MTc5MTcwNjA0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c7fc1c9527ec6',t:'MTc5MTcwNzM4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
