@@ -418,10 +418,6 @@ The parser will automatically:
               </ul>
             </details>
             <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-              <button class="btn btn-secondary" onclick="document.getElementById('captureInput').click()" title="Upload or take photos of a printed paper — AI transcribes the questions">
-                <span class="material-symbols-rounded">photo_camera</span> Capture Paper / PDF
-              </button>
-              <input type="file" id="captureInput" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="capturePaper(this.files); this.value='';">
               <button class="btn btn-primary" onclick="processWithAI()">
                 <span class="material-symbols-rounded">auto_awesome</span> Process with AI
               </button>
@@ -429,9 +425,18 @@ The parser will automatically:
                 <span class="material-symbols-rounded">bolt</span> Instant Parse (no AI)
               </button>
               <button class="btn btn-secondary" onclick="document.getElementById('pasteArea').value=''">Clear</button>
+              <button class="btn btn-primary" onclick="goStep(4)">Next: Export <span class="material-symbols-rounded">arrow_forward</span></button>
             </div>
-            <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">Capture: up to 4 photos OR a PDF of the paper. A text PDF is read instantly with ZERO AI use; scanned PDFs and photos are transcribed by the AI (4 pages per request). Printed text in good light reads best.</p>
             <div class="ai-status" id="aiStatusLine"></div>
+          </div>
+
+          <!-- CAPTURE: always visible, between Paste Text and Manual -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin:18px 0;">
+            <button class="btn btn-secondary" onclick="document.getElementById('captureInput').click()" title="Upload or take photos of a printed paper — AI transcribes the questions">
+              <span class="material-symbols-rounded">photo_camera</span> Capture Paper / PDF
+            </button>
+            <input type="file" id="captureInput" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="capturePaper(this.files); this.value='';">
+            <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;max-width:540px;">Capture: up to 4 photos OR a PDF of the paper. A text PDF is read instantly with ZERO AI use; scanned PDFs and photos are transcribed by the AI (4 pages per request). Printed text in good light reads best.</p>
           </div>
 
           <!-- MANUAL TAB -->
@@ -511,10 +516,7 @@ The parser will automatically:
             <div class="card-header-text">
               <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h2>Questions (<span id="qCountBadge">0</span>)</h2>
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                  <button class="btn btn-sm btn-primary" onclick="goStep(4)">Next: Export <span class="material-symbols-rounded" style="font-size:15px;">arrow_forward</span></button>
-                  <button class="btn btn-sm" style="background:rgba(220,38,38,0.1);color:var(--error);" onclick="clearAllQuestions()">Clear All</button>
-                </div>
+                <button class="btn btn-sm" style="background:rgba(220,38,38,0.1);color:var(--error);" onclick="clearAllQuestions()">Clear All</button>
               </div>
               <p class="subtitle">Edit anything. Auto-saves.</p>
             </div>
@@ -1367,7 +1369,9 @@ function preprocess(raw) {
   t = t.replace(/^\s*\d+\s*mixed\s*questions?\s*$/im,'');
   t = t.replace(/^\s*class\s+\d+.*$/im,'');
   // answer blocks
-  t = t.replace(/(?:^|\n)\s*\(?\s*(?:answer|ans|solution|key points?|answer hint)\s*[:\-)][\s\S]*?(?=(?:\n\s*(?:Q?\d+[\.\)\:]|SECTION|PART)\b)|$)/gi, '\n');
+  // "Ans: ..." blocks end at the NEXT numbered/section line (space after the
+  // number's punctuation is normal: "8) Which...") or at end of text.
+  t = t.replace(/(?:^|\n)\s*\(?\s*(?:answer|ans|solution|key points?|answer hint)\s*[:\-)][\s\S]*?(?=\n\s*(?:Q?\s?\d+\s*[\.\)\:]|(?:SECTION|PART|GROUP)\b)|$)/gi, '\n');
   t = t.replace(/\.{3,}/g,'___');
   t = t.replace(/^(\s*\d+[\.\)])([A-Za-z])/gm,'$1 $2');
   t = t.replace(/\n{3,}/g,'\n\n');
@@ -1504,6 +1508,8 @@ function processOffline() {
     const L = line.trim(); if (!L) continue;
     // stop if answer key sneaks through
     if (/^(ANSWER\s*KEY|MARKING\s*SCHEME|FILL\-?UPS?)/i.test(L)) break;
+    // bare key entries like "(b)" / "c" are never questions
+    if (/^\(?\s*[a-dA-D]\s*\)?[\.\)]?$/.test(L)) continue;
     // paper metadata / word-limit notes are not questions (rules already read from raw)
     if (/^\(?\s*(?:answer in|word limit)/i.test(L)) continue;
     if (/^(?:time allowed|maximum marks|max\.? marks|subject\s*:|class\s*:|duration\s*:|total questions)/i.test(L)) continue;
@@ -1841,6 +1847,7 @@ Transcribe EVERY question you can see into plain text using EXACTLY this dialect
 - Per-question marks at line end in brackets: (2) or [3]
 - Skip titles, school headers, general instructions, answer keys and marking schemes.
 - Handwriting: best effort; if a word is unreadable, guess from context — never insert "?" placeholders.
+If NO question-paper image is attached to this request, or nothing in it is readable, reply with exactly this one word and nothing else: UNREADABLE
 Output ONLY the transcribed paper text. No commentary, no markdown fences.`;
 
 function fileToVisionBase64(file, maxSide) {
@@ -1914,7 +1921,12 @@ async function capturePaper(fileList) {
       setAIStatus('info', 'AI is reading page batch ' + (Math.floor(i / 4) + 1) + '…');
       visionText += (await geminiChat(CAPTURE_PROMPT, '', batch)) + '\n\n';
     }
-    const clean = (pdfText + '\n' + visionText).replace(/```[a-z]*\n?/gi, '').trim();
+    let clean = (pdfText + '\n' + visionText).replace(/```[a-z]*\n?/gi, '').trim();
+    if (/^\s*UNREADABLE\b/i.test(clean) && !pdfText.trim()) {
+      setAIStatus('bad', 'The AI received no readable image — update the site proxy (netlify/functions/gemini.js) or retake the photos.');
+      showSnackbar('No image reached the AI — nothing added');
+      return;
+    }
     if (!clean) {
       setAIStatus('bad', 'No text recognised in the photo/PDF.');
       showSnackbar('Nothing readable in that file');
@@ -2230,5 +2242,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48f11199fb2aa33',t:'MTc5MTczNDMxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48f41c59d133c33',t:'MTc5MTczNjMwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
