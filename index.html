@@ -1966,9 +1966,43 @@ async function downloadPDF(){
     pagebreak: { mode: ['css', 'legacy'], avoid: ['.pv-question', '.pv-student-box', '.pv-instructions'] }
   };
 
+  // Adaptive scale: scale 3 on a long paper makes a 70+ MEGAPIXEL canvas (~300 MB),
+  // which low-power browsers/devices silently blank out instead of erroring.
+  // Keep the capture canvas inside safe limits on every device.
+  const elemW = source.offsetWidth || 712, elemH = source.scrollHeight || 2000;
+  let scale = Math.min(3, Math.sqrt(12000000 / (elemW * elemH)), 12000 / elemH);
+  scale = Math.max(1.4, Math.round(scale * 100) / 100);
+  opt.html2canvas.scale = scale;
+
+  // Verify the renderer actually painted: sample rows for ink. Browsers that
+  // hit canvas limits return a blank canvas with NO error — so we check.
+  const inkRatio = (cv) => {
+    try {
+      const ctx = cv.getContext('2d');
+      let ink = 0, tot = 0;
+      for (let y = 100; y < cv.height - 4; y += 400) {
+        const d = ctx.getImageData(0, y, cv.width, 1).data;
+        for (let x = 0; x < cv.width; x += 60) { tot++; const k = x << 2; if (d[k+3] > 10 && (d[k] < 245 || d[k+1] < 245 || d[k+2] < 245)) ink++; }
+      }
+      return tot ? ink / tot : 0;
+    } catch (e) { return 1; }   // cannot inspect -> assume fine
+  };
+
   try {
-    const worker = html2pdf().set(opt).from(source).toCanvas();
-    const canvas = await worker.get('canvas');
+    let worker = html2pdf().set(opt).from(source).toCanvas();
+    let canvas = await worker.get('canvas');
+    if (inkRatio(canvas) < 0.002) {
+      // renderer blanked (device canvas limit) — one retry at a safe scale
+      opt.html2canvas.scale = 1.4;
+      worker = html2pdf().set(opt).from(source).toCanvas();
+      canvas = await worker.get('canvas');
+    }
+    if (inkRatio(canvas) < 0.002) {
+      source.classList.remove('pdf-capture');
+      showSnackbar('PDF render failed on this device — opening Print instead');
+      printPaper();
+      return;
+    }
     // Blank-last-page guard: if the final page slice of the canvas has no ink
     // at all, drop that page before saving.
     let blankLast = false;
@@ -2011,5 +2045,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c3ea91be9407d',t:'MTc5MTcwNDcyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48c5f127893922a',t:'MTc5MTcwNjA0OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
