@@ -380,14 +380,19 @@
           </div>
 
           <!-- Tabs -->
-          <div style="display:flex;gap:6px;background:var(--bg-input);border-radius:50px;padding:4px;width:fit-content;margin-bottom:16px;">
+          <div style="display:flex;gap:6px;background:var(--bg-input);border-radius:50px;padding:4px;width:fit-content;margin-bottom:16px;flex-wrap:wrap;">
             <button id="tabPasteBtn" onclick="switchTab('paste')" style="padding:8px 16px;border:none;border-radius:50px;background:var(--bg-card);color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
               <span class="material-symbols-rounded" style="font-size:16px;">content_paste</span> Paste Text
             </button>
+            <button id="captureTabBtn" onclick="document.getElementById('captureInput').click()" title="Upload or take photos of a printed paper — the AI reads it and builds the paper" style="padding:8px 16px;border:none;border-radius:50px;background:transparent;color:var(--accent-ai);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
+              <span class="material-symbols-rounded" style="font-size:16px;">photo_camera</span> Capture Paper
+            </button>
+            <input type="file" id="captureInput" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="capturePaper(this.files); this.value='';">
             <button id="tabManualBtn" onclick="switchTab('manual')" style="padding:8px 16px;border:none;border-radius:50px;background:transparent;color:var(--text-muted);font-weight:600;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
               <span class="material-symbols-rounded" style="font-size:16px;">edit_note</span> Manual
             </button>
           </div>
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:-8px 0 12px;">Capture: up to 4 photos OR a PDF. The AI reads the pages AND builds the paper itself (sections, types, marks); a text PDF skips the reading step. If the AI is unavailable, Instant Parse runs automatically. Printed text in good light reads best.</p>
 
           <!-- PASTE TAB -->
           <div id="tab-paste">
@@ -428,15 +433,6 @@ The parser will automatically:
               <button class="btn btn-primary" onclick="goStep(4)">Next: Export <span class="material-symbols-rounded">arrow_forward</span></button>
             </div>
             <div class="ai-status" id="aiStatusLine"></div>
-          </div>
-
-          <!-- CAPTURE: always visible, between Paste Text and Manual -->
-          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;margin:18px 0;">
-            <button class="btn btn-secondary" onclick="document.getElementById('captureInput').click()" title="Upload or take photos of a printed paper — AI transcribes the questions">
-              <span class="material-symbols-rounded">photo_camera</span> Capture Paper / PDF
-            </button>
-            <input type="file" id="captureInput" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="capturePaper(this.files); this.value='';">
-            <p style="font-size:0.75rem;color:var(--text-muted);text-align:center;max-width:540px;">Capture: up to 4 photos OR a PDF of the paper. A text PDF is read instantly with ZERO AI use; scanned PDFs and photos are transcribed by the AI (4 pages per request). Printed text in good light reads best.</p>
           </div>
 
           <!-- MANUAL TAB -->
@@ -1934,11 +1930,9 @@ async function capturePaper(fileList) {
     }
     const pa = document.getElementById('pasteArea');
     const old = (pa.value || '').trim();
-    pa.value = old ? old + '\n\n' + clean : clean;   // append => parser renumbers & merges sections
-    processOffline();
+    pa.value = old ? old + '\n\n' + clean : clean;   // append => renumber & section merge
+    await processWithAI();                            // the AI builds the paper (offline = fallback only)
     goStep(3);
-    setAIStatus('ai', 'Captured text merged into the paste box — edit anything, then re-parse.');
-    showSnackbar('Capture added — ' + questions.length + ' questions now');
   } catch (e) {
     console.error(e);
     setAIStatus('bad', 'Capture failed: ' + (e && e.message ? e.message : e));
@@ -2242,5 +2236,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48f41c59d133c33',t:'MTc5MTczNjMwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
