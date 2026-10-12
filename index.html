@@ -117,6 +117,9 @@
   .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
   .form-group label .material-symbols-rounded { font-size: 15px; color: var(--accent); }
   .form-group input, .form-group textarea, .form-group select { padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 500; background: var(--bg-input); color: var(--text-main); outline: none; font-family: 'Outfit', sans-serif; transition: all 0.2s; }
+  /* native date-picker calendar follows the app theme */
+  .form-group input[type="date"] { color-scheme: light; }
+  [data-theme="dark"] .form-group input[type="date"] { color-scheme: dark; }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus { background: var(--bg-input-focus); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
   .form-group textarea { resize: vertical; min-height: 100px; line-height: 1.55; }
 
@@ -321,7 +324,6 @@
           <input type="checkbox" id="toggleAutoInstr" checked onchange="setAutoInstr(this.checked)" style="width:18px;height:18px;accent-color:var(--accent);">
           <span style="font-weight:600;font-size:0.9rem;">Auto-fit instructions to the paper (sections, question numbers, marks, word limits)</span>
         </label>
-        <p id="autoInstrNote" style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;">Standard instructions are generated from your questions at export time, so they always match the final paper. Uncheck to write your own in the box above.</p>
       </div>
 
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border-color);">
@@ -384,7 +386,7 @@
             <button id="tabPasteBtn" onclick="switchTab('paste')" style="padding:8px 16px;border:none;border-radius:50px;background:var(--bg-card);color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
               <span class="material-symbols-rounded" style="font-size:16px;">content_paste</span> Paste Text
             </button>
-            <button id="captureTabBtn" onclick="document.getElementById('captureInput').click()" title="Upload or take photos of a printed paper — the AI reads it and builds the paper" style="padding:8px 16px;border:none;border-radius:50px;background:transparent;color:var(--accent-ai);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
+            <button id="captureTabBtn" onclick="document.getElementById('captureInput').click()" title="Up to 4 photos/PDFs (scanned PDFs: 16 pages) — the AI reads them and builds the paper" style="padding:8px 16px;border:none;border-radius:50px;background:transparent;color:var(--accent-ai);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.84rem;display:flex;align-items:center;gap:6px;">
               <span class="material-symbols-rounded" style="font-size:16px;">photo_camera</span> Capture Paper
             </button>
             <input type="file" id="captureInput" accept="image/*,application/pdf" capture="environment" multiple style="display:none" onchange="capturePaper(this.files); this.value='';">
@@ -392,7 +394,7 @@
               <span class="material-symbols-rounded" style="font-size:16px;">edit_note</span> Manual
             </button>
           </div>
-          <p style="font-size:0.75rem;color:var(--text-muted);margin:-8px 0 12px;">Capture: up to 4 photos OR a PDF. The AI reads the pages AND builds the paper itself (sections, types, marks); a text PDF skips the reading step. If the AI is unavailable, Instant Parse runs automatically. Printed text in good light reads best.</p>
+          <p style="font-size:0.72rem;color:var(--text-soft);margin:-10px 0 12px;">Max 4 photos/PDFs per capture.</p>
 
           <!-- PASTE TAB -->
           <div id="tab-paste">
@@ -409,19 +411,6 @@ The parser will automatically:
 • Detect sections and marks
 • Build clean questions"></textarea>
             </div>
-            <details style="margin:10px 0 0;background:var(--bg-section);border:1px solid var(--border-color);border-radius:12px;padding:10px 14px;">
-              <summary style="cursor:pointer;font-weight:700;font-size:0.82rem;">Formatting tips for a perfect Instant Parse (no AI)</summary>
-              <ul style="margin:8px 0 2px 18px;font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
-                <li>One question per numbered line: <b>1. question text</b></li>
-                <li>Options on their own lines: <b>(a) …</b> <b>(b) …</b> (same line also works)</li>
-                <li>Marks in brackets at the end: <b>(2)</b> or <b>(2 Marks)</b></li>
-                <li>Section headings on their own line: <b>SECTION B …</b> — add <b>× 3 = 15 Marks</b> or <b>(3 marks each)</b> for per-question marks, and <b>(Attempt any 5 out of 7 …)</b> for attempt rules</li>
-                <li>True/False: end the statement with <b>[True / False]</b>, or put questions under a <b>True or False</b> sub-heading</li>
-                <li>OR choice: keep <b>OR</b> on its own line between the two alternatives</li>
-                <li>Fill-ups: blanks like <b>______</b> or <b>……</b> are detected</li>
-                <li>Answer key at the end is fine — parsing stops there automatically</li>
-              </ul>
-            </details>
             <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
               <button class="btn btn-primary" onclick="processWithAI()">
                 <span class="material-symbols-rounded">auto_awesome</span> Process with AI
@@ -993,10 +982,6 @@ function setAutoInstr(v) {
   if (t) t.checked = !!v;
   const ta = document.getElementById('instructions');
   if (ta) ta.disabled = !!v;
-  const note = document.getElementById('autoInstrNote');
-  if (note) note.textContent = v
-    ? 'Standard instructions are generated from your questions at export time, so they always match the final paper. Uncheck to write your own in the box above.'
-    : 'Manual mode — whatever is in the box above prints on the paper.';
   saveSavedState(); refreshLivePreviews();
 }
 
