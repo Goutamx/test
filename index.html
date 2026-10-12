@@ -117,9 +117,32 @@
   .form-group label { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
   .form-group label .material-symbols-rounded { font-size: 15px; color: var(--accent); }
   .form-group input, .form-group textarea, .form-group select { padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 500; background: var(--bg-input); color: var(--text-main); outline: none; font-family: 'Outfit', sans-serif; transition: all 0.2s; }
-  /* native date-picker calendar follows the app theme */
-  .form-group input[type="date"] { color-scheme: light; }
-  [data-theme="dark"] .form-group input[type="date"] { color-scheme: dark; }
+  /* ---- app-native date picker ---- */
+  .dp-wrap { position: relative; }
+  .dp-field { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 500; background: var(--bg-input); color: var(--text-main); font-family: 'Outfit', sans-serif; cursor: pointer; transition: all 0.2s; text-align: left; }
+  .dp-field:hover { background: var(--bg-input-focus); }
+  .dp-field:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+  .dp-field .dp-ph { color: var(--text-muted); }
+  .dp-pop { position: absolute; top: calc(100% + 6px); left: 0; width: 292px; max-width: calc(100vw - 32px); background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18); padding: 14px; z-index: 420; display: none; }
+  [data-theme="dark"] .dp-pop { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5); }
+  .dp-pop.open { display: block; animation: dpIn 0.16s ease; }
+  @keyframes dpIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .dp-head { display: flex; align-items: center; gap: 2px; margin-bottom: 8px; }
+  .dp-title { flex: 1; text-align: center; font-weight: 700; font-size: 0.92rem; color: var(--text-main); }
+  .dp-nav { border: none; background: transparent; color: var(--text-muted); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1; font-family: inherit; }
+  .dp-nav:hover { background: var(--bg-section); color: var(--text-main); }
+  .dp-week { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+  .dp-week span { text-align: center; font-size: 0.68rem; font-weight: 700; color: var(--text-soft); letter-spacing: 0.4px; }
+  .dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .dp-day { border: none; background: transparent; height: 34px; border-radius: 10px; font-family: inherit; font-size: 0.85rem; font-weight: 600; color: var(--text-main); cursor: pointer; }
+  .dp-day:hover { background: var(--bg-section); }
+  .dp-day.blank { visibility: hidden; pointer-events: none; }
+  .dp-day.today { box-shadow: inset 0 0 0 1.5px var(--accent); color: var(--accent); }
+  .dp-day.sel { background: var(--accent); color: #FFF; }
+  .dp-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+  .dp-link { border: none; background: transparent; color: var(--accent); font-family: inherit; font-weight: 700; font-size: 0.8rem; cursor: pointer; padding: 4px 6px; border-radius: 8px; }
+  .dp-link:hover { background: var(--bg-section); }
+  @media print { .dp-pop { display: none !important; } }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus { background: var(--bg-input-focus); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
   .form-group textarea { resize: vertical; min-height: 100px; line-height: 1.55; }
 
@@ -201,6 +224,8 @@
   }
 
   /* Various dynamic states */
+  /* Netlify free-plan "Powered by Netlify" badge (injected at serve time) — keep hidden */
+  #nl-badge-frame, .nl-badge, [id^="nl-badge"] { display: none !important; visibility: hidden !important; pointer-events: none !important; }
   #snackbar.show { opacity: 1 !important; transform: translateX(-50%) translateY(0) !important; }
   #welcomeModal.active { display: flex !important; }
 </style>
@@ -273,7 +298,28 @@
         </div>
         <div class="form-group">
           <label>Date of Exam</label>
-          <input type="date" id="examDate" onchange="onExamDateChange()">
+          <div class="dp-wrap" id="dpWrap">
+            <button type="button" class="dp-field" id="dpField" onclick="dpToggle(event)" aria-haspopup="dialog" aria-expanded="false">
+              <span id="dpLabel" class="dp-ph">Pick date</span>
+              <span class="material-symbols-rounded" style="font-size:20px;color:var(--text-muted);">calendar_month</span>
+            </button>
+            <input type="hidden" id="examDate">
+            <div class="dp-pop" id="dpPop" role="dialog" aria-label="Choose date">
+              <div class="dp-head">
+                <button type="button" class="dp-nav" onclick="dpMove(-12)" title="Previous year">&#171;</button>
+                <button type="button" class="dp-nav" onclick="dpMove(-1)" title="Previous month">&#8249;</button>
+                <div class="dp-title" id="dpTitle">Month Year</div>
+                <button type="button" class="dp-nav" onclick="dpMove(1)" title="Next month">&#8250;</button>
+                <button type="button" class="dp-nav" onclick="dpMove(12)" title="Next year">&#187;</button>
+              </div>
+              <div class="dp-week"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+              <div class="dp-grid" id="dpGrid"></div>
+              <div class="dp-foot">
+                <button type="button" class="dp-link" onclick="dpToday()">Today</button>
+                <button type="button" class="dp-link" onclick="dpClear()">Clear</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label>Duration</label>
@@ -750,6 +796,7 @@ function loadState() {
     ['schoolName','examTitle','subject','classGrade','teacherName','examDate','duration','totalMarks','instructions'].forEach(k => {
       if (d[k] && document.getElementById(k)) document.getElementById(k).value = d[k];
     });
+    if (typeof dpSync === 'function') dpSync();
     if (d.logo) {
       logoBase64 = d.logo;
       const img = document.getElementById('logoPreview');
@@ -984,6 +1031,54 @@ function setAutoInstr(v) {
   if (ta) ta.disabled = !!v;
   saveSavedState(); refreshLivePreviews();
 }
+
+/* ==================== APP-NATIVE DATE PICKER ==================== */
+const DP_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let dpView = { y: 0, m: 0 };
+function dpSync() {
+  const lbl = document.getElementById('dpLabel'); if (!lbl) return;
+  const v = val('examDate');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const d = new Date(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10));
+    lbl.textContent = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    lbl.classList.remove('dp-ph');
+  } else { lbl.textContent = 'Pick date'; lbl.classList.add('dp-ph'); }
+}
+function dpToggle(e) { if (e) e.stopPropagation(); document.getElementById('dpPop').classList.contains('open') ? dpClose() : dpOpen(); }
+function dpOpen() {
+  const v = val('examDate'); const now = new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) dpView = { y: +v.slice(0, 4), m: +v.slice(5, 7) - 1 };
+  else dpView = { y: now.getFullYear(), m: now.getMonth() };
+  dpRender();
+  document.getElementById('dpPop').classList.add('open');
+  document.getElementById('dpField').setAttribute('aria-expanded', 'true');
+}
+function dpClose() {
+  const pop = document.getElementById('dpPop'); if (!pop) return;
+  pop.classList.remove('open');
+  document.getElementById('dpField').setAttribute('aria-expanded', 'false');
+}
+function dpMove(n) { const m = dpView.m + n; dpView.y += Math.floor(m / 12); dpView.m = ((m % 12) + 12) % 12; dpRender(); }
+function dpRender() {
+  document.getElementById('dpTitle').textContent = DP_MONTHS[dpView.m] + ' ' + dpView.y;
+  const grid = document.getElementById('dpGrid'); grid.innerHTML = '';
+  const first = new Date(dpView.y, dpView.m, 1).getDay();
+  const days = new Date(dpView.y, dpView.m + 1, 0).getDate();
+  const now = new Date(); const sel = val('examDate');
+  for (let i = 0; i < first; i++) grid.insertAdjacentHTML('beforeend', '<button type="button" class="dp-day blank" tabindex="-1"></button>');
+  for (let d = 1; d <= days; d++) {
+    const iso = dpView.y + '-' + String(dpView.m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const cls = ['dp-day'];
+    if (d === now.getDate() && dpView.m === now.getMonth() && dpView.y === now.getFullYear()) cls.push('today');
+    if (iso === sel) cls.push('sel');
+    grid.insertAdjacentHTML('beforeend', '<button type="button" class="' + cls.join(' ') + '" onclick="dpPick(\'' + iso + '\')">' + d + '</button>');
+  }
+}
+function dpPick(iso) { document.getElementById('examDate').value = iso; onExamDateChange(); dpSync(); dpRender(); dpClose(); }
+function dpToday() { const n = new Date(); dpPick(n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0')); }
+function dpClear() { document.getElementById('examDate').value = ''; onExamDateChange(); dpSync(); dpClose(); }
+document.addEventListener('click', e => { const w = document.getElementById('dpWrap'); if (w && !w.contains(e.target)) dpClose(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') dpClose(); });
 
 function onExamDateChange() {
   // The date may live in exactly ONE place: the Details header OR the candidate box.
@@ -2221,5 +2316,5 @@ function printPaper(){
   setTimeout(() => window.print(), 200);
 }
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a497b0796f7e59f0',t:'MTc5MTgyNDcyNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
